@@ -1895,6 +1895,14 @@ if (supabase) {
       currentStudent.name = newSession.user.user_metadata?.name || nameFromEmail(currentStudent.email);
       currentStudent.initials = initialsFromName(currentStudent.name);
       dataMode = 'live';
+      // The "I am a Teacher/Student" choice on the login screen only lives in
+      // the `loginRole` variable, which resets to its default on the fresh
+      // page load the magic-link email redirects back to — so without this,
+      // enterApp() below would always land a student pick back on Teacher.
+      // sendMagicLink() stashes the choice in localStorage right before
+      // sending, since that's the one thing that survives the round trip.
+      const savedRole = localStorage.getItem('ct_login_role');
+      if (savedRole) { loginRole = savedRole; localStorage.removeItem('ct_login_role'); }
       await loadEnsemblesFromDB();
       enterApp();
       await handleCheckinDeepLink(); // no-op unless the URL has ?checkin=<eventId>&ensemble=<ensembleId> (see genQR())
@@ -1945,6 +1953,7 @@ async function sendMagicLink() {
   }
   btn.disabled = true;
   btn.style.opacity = '.6';
+  localStorage.setItem('ct_login_role', loginRole); // read back in onAuthStateChange after the redirect
   const { error } = await supabase.auth.signInWithOtp({
     email,
     // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
