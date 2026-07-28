@@ -40,6 +40,13 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    `is_ensemble_member(ensemble_id)`, back most of these policies. They're
    `security definer` so they can read `ensemble_members` without
    triggering that table's own RLS recursively.
+3. `migrations/0003_ensemble_members_invite.sql` — lets a teacher add a
+   student to the roster (or import a CSV/pasted list) before that student
+   has ever signed in. Adds `email`/`name` columns to `ensemble_members`
+   for these not-yet-linked rows, a partial unique index so the same
+   email can't be invited to an ensemble twice, and a trigger on
+   `auth.users` that backfills `user_id` the moment someone signs up with
+   a matching email.
 
 ## 3. Enable email auth
 

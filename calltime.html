@@ -1820,7 +1820,7 @@ if (!SUPABASE_CONFIGURED) {
 let authSession = null; // the current Supabase auth session, kept in sync by onAuthStateChange
 
 if (supabase) {
-  supabase.auth.onAuthStateChange((event, newSession) => {
+  supabase.auth.onAuthStateChange(async (event, newSession) => {
     authSession = newSession;
     if (newSession && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
       // Magic-link redirects land back here with #access_token=... in the URL — drop it once consumed.
@@ -1828,6 +1828,10 @@ if (supabase) {
         history.replaceState(null, '', window.location.pathname + window.location.search);
       }
       currentStudent.email = newSession.user.email || currentStudent.email;
+      currentStudent.name = newSession.user.user_metadata?.name || nameFromEmail(currentStudent.email);
+      currentStudent.initials = initialsFromName(currentStudent.name);
+      dataMode = 'live';
+      await loadEnsemblesFromDB();
       enterApp();
     } else if (event === 'SIGNED_OUT') {
       resetToLogin();
@@ -2341,19 +2345,25 @@ function parsePaste() {
   btn.style.display = parsedStudents.length ? 'inline-flex' : 'none';
 }
 
-function importPasted() {
+async function importPasted() {
   if(!parsedStudents.length) return;
-  students.push(...parsedStudents);
+  if (dataMode === 'live') {
+    const ok = await insertRosterMembers(parsedStudents);
+    if (!ok) return;
+  } else {
+    students.push(...parsedStudents);
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('import');
+  const ct = parsedStudents.length;
   parsedStudents = [];
   document.getElementById('paste-input').value = '';
   document.getElementById('paste-preview').style.display = 'none';
   document.getElementById('paste-import-btn').style.display = 'none';
   const sendInvites = document.getElementById('send-invites').checked;
   // In production: fire invite emails here
-  showToast(parsedStudents.length + ' students imported' + (sendInvites ? ' — invites sent!' : '.'));
+  showToast(ct + ' students imported' + (sendInvites ? ' — invites sent!' : '.'));
 }
 
 function handleCSV(input) {
@@ -2385,9 +2395,14 @@ function handleCSV(input) {
   reader.readAsText(file);
 }
 
-function importCSV() {
+async function importCSV() {
   if(!parsedCSV.length) return;
-  students.push(...parsedCSV);
+  if (dataMode === 'live') {
+    const ok = await insertRosterMembers(parsedCSV);
+    if (!ok) return;
+  } else {
+    students.push(...parsedCSV);
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('import');
@@ -2396,13 +2411,40 @@ function importCSV() {
   showToast(ct + ' students imported from CSV!');
 }
 
-function addStudent() {
+// Shared by importPasted()/importCSV(): inserts {n,e,r} rows into
+// ensemble_members (no user_id yet — see migration 0003) and reloads the
+// roster so e.students/students[] reflect what actually landed in the DB.
+async function insertRosterMembers(rows) {
+  const e = activeEns();
+  const { error } = await supabase.from('ensemble_members').insert(rows.map(s => ({
+    ensemble_id: e.id, name: s.n, email: s.e || null, part: s.r,
+    role: 'student', status: 'active',
+  })));
+  if (error) { showToast('Import failed: ' + error.message); return false; }
+  await loadRosterFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+async function addStudent() {
   const n = document.getElementById('new-s-name').value.trim();
   const email = document.getElementById('new-s-email').value.trim();
   const r = document.getElementById('new-s-role').value.trim() || 'Ensemble';
   if(!n) { alert('Please enter a name.'); return; }
-  const i = n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  students.push({n, i, r, e:email, s:'present', t:'—', a:0});
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('ensemble_members').insert({
+      ensemble_id: e.id, name: n, email: email || null, part: r,
+      role: 'student', status: 'active',
+    });
+    if (error) { showToast('Could not add student: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    const i = n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    students.push({n, i, r, e:email, s:'present', t:'—', a:0});
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('student');
@@ -2410,7 +2452,7 @@ function addStudent() {
   document.getElementById('new-s-email').value='';
   document.getElementById('new-s-role').value='';
   document.getElementById('new-s-parent').value='';
-  showToast(n + ' added — invite sent to ' + (email||'student'));
+  showToast(n + ' added' + (dataMode==='live' ? '.' : ' — invite sent to ' + (email||'student')));
 }
 
 function showToast(msg) {
@@ -3435,7 +3477,10 @@ const ensembleDefaults = () => ({
   joinRequests: [], // {name, initials, email, role, status:'pending'|'approved'|'denied'}
 });
 
-let ensembles = [
+// Seed data for "Skip for now (demo mode)" — never touches Supabase.
+// Live-mode ensembles are loaded from the DB into `ensembles` instead;
+// see loadEnsemblesFromDB() in the SUPABASE CLIENT + AUTH block above.
+const DEMO_ENSEMBLES = [
   {
     id: 1,
     name: 'Cardinal Voices',
@@ -3483,9 +3528,113 @@ let ensembles = [
   },
 ];
 
+let dataMode = 'demo'; // 'demo' (DEMO_ENSEMBLES, no network) | 'live' (Supabase-backed)
+let ensembles = DEMO_ENSEMBLES;
 let activeEnsIdx = 0;
 
 function activeEns() { return ensembles[activeEnsIdx]; }
+
+// In live mode `ensembles` holds every ensemble in the system (students
+// need to browse all of them to send join requests); teacher-facing UI
+// (landing cards, the ensemble switcher) should only ever list the ones
+// this signed-in user actually teaches.
+function teacherEnsembles() {
+  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher') : ensembles;
+}
+
+/* ═══════════════════════════════════════════
+   ENSEMBLE / ROSTER DATA LAYER (live mode)
+═══════════════════════════════════════════ */
+
+function initialsFromName(name) {
+  return (name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function nameFromEmail(email) {
+  const local = (email || '').split('@')[0].replace(/[._]+/g, ' ').trim();
+  if (!local) return email || 'Unnamed';
+  return local.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Maps a DB `ensembles` row (+ the current user's own ensemble_members row,
+// if any) into the shape every render function in this file already
+// expects. `students`/`joinRequests` stay unpopulated here — those come
+// from the roster query in loadRosterFromDB(), run when a teacher opens
+// the ensemble (full roster) since RLS only lets a student see their own
+// membership row, never their classmates'.
+function mapDbEnsemble(dbEns, myMembership) {
+  const isMyPendingOrDenied = myMembership && myMembership.role === 'student' && myMembership.status !== 'active';
+  const isMyActiveEnrollment = myMembership && myMembership.role === 'student' && myMembership.status === 'active';
+  return {
+    ...ensembleDefaults(),
+    id: dbEns.id,
+    name: dbEns.name,
+    sub: dbEns.sub || '',
+    term: dbEns.term || '',
+    teacher: dbEns.teacher_name || '',
+    email: dbEns.teacher_email || '',
+    color: dbEns.color || '#534AB7',
+    desc: dbEns.description || '',
+    schedule: dbEns.schedule || '',
+    driveURL: dbEns.drive_url || '',
+    createdBy: dbEns.created_by,
+    myRole: myMembership ? myMembership.role : null,
+    myStatus: myMembership ? myMembership.status : null,
+    students: [],
+    joinRequests: isMyPendingOrDenied
+      ? [{ name: currentStudent.name, email: currentStudent.email, status: myMembership.status }]
+      : [],
+    enrolledStudentEmails: isMyActiveEnrollment ? [currentStudent.email] : [],
+  };
+}
+
+function mapMemberToStudent(m) {
+  const name = m.name || nameFromEmail(m.email);
+  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—', a: m.absences || 0, memberId: m.id, userId: m.user_id };
+}
+
+function mapMemberToJoinRequest(m) {
+  const name = m.name || nameFromEmail(m.email);
+  return { name, initials: initialsFromName(name), email: m.email || '', role: m.part || '', status: m.status, memberId: m.id };
+}
+
+// Full roster for the ensemble the teacher is currently in — every member
+// row, not just the signed-in user's own (RLS allows this for teachers only).
+async function loadRosterFromDB(e) {
+  const { data, error } = await supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id);
+  if (error) { console.error(error); showToast('Could not load roster: ' + error.message); return; }
+  const rows = data || [];
+  e.students = rows.filter(m => m.role === 'student' && m.status === 'active').map(mapMemberToStudent);
+  e.joinRequests = rows.filter(m => m.role === 'student' && m.status !== 'active').map(mapMemberToJoinRequest);
+}
+
+// Every ensemble in the system (any signed-in user may browse — students
+// need this to send join requests) plus the signed-in user's own
+// membership rows, so we know which ones they teach/are enrolled in
+// without a per-ensemble round trip.
+async function loadEnsemblesFromDB() {
+  const uid = authSession.user.id;
+  const [ensRes, myRes, studentCountRes] = await Promise.all([
+    supabase.from('ensembles').select('*').order('created_at'),
+    supabase.from('ensemble_members').select('*').eq('user_id', uid),
+    supabase.from('ensemble_members').select('ensemble_id').eq('role', 'student').eq('status', 'active'),
+  ]);
+  if (ensRes.error || myRes.error) {
+    console.error(ensRes.error || myRes.error);
+    showToast('Could not load ensembles: ' + (ensRes.error || myRes.error).message);
+    ensembles = [];
+    activeEnsIdx = 0;
+    return;
+  }
+  const countByEns = {};
+  (studentCountRes.data || []).forEach(r => { countByEns[r.ensemble_id] = (countByEns[r.ensemble_id] || 0) + 1; });
+  ensembles = (ensRes.data || []).map(dbEns => {
+    const ens = mapDbEnsemble(dbEns, (myRes.data || []).find(m => m.ensemble_id === dbEns.id));
+    ens.studentCount = countByEns[dbEns.id] || 0;
+    return ens;
+  });
+  activeEnsIdx = 0;
+}
 
 function loadEnsembleContext() {
   const e = activeEns();
@@ -3532,18 +3681,27 @@ function setLandingRole(role, btn, skipAutoEnter) {
 }
 
 function renderLanding() {
-  // Teacher cards
+  // Teacher cards. In live mode `ensembles` holds every ensemble in the
+  // system (students need to browse all of them to send join requests —
+  // see renderStudentLanding) so the teacher landing must filter down to
+  // the ones this user actually teaches.
   const el = document.getElementById('ensemble-cards');
-  if(el) el.innerHTML = ensembles.map((e,i) => `
+  if(!el) return;
+  const list = teacherEnsembles();
+  if(dataMode === 'live' && list.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You don\'t teach any ensembles yet.<br>Create one below to get started.</div>';
+    return;
+  }
+  el.innerHTML = list.map(e => { const i = ensembles.indexOf(e); const count = dataMode === 'live' ? (e.studentCount||0) : (e.students||[]).length; return `
     <div class="ens-card" onclick="enterEnsemble(${i})">
       <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
       <div style="flex:1;min-width:0">
         <div style="font-size:16px;font-weight:700;color:var(--tx)">${e.name}</div>
         <div style="font-size:12px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${(e.students||[]).length} students</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${count} students</div>
       </div>
       <i class="ti ti-chevron-right" style="color:var(--t3);font-size:18px"></i>
-    </div>`).join('');
+    </div>`; }).join('');
 }
 
 function renderStudentLanding(skipAutoEnter) {
@@ -3612,16 +3770,26 @@ function renderStudentLanding(skipAutoEnter) {
   }
 }
 
-function requestJoin(ensIdx) {
+async function requestJoin(ensIdx) {
   const e = ensembles[ensIdx];
-  if(!e.joinRequests) e.joinRequests = [];
-  e.joinRequests.push({
-    name: currentStudent.name,
-    initials: currentStudent.initials,
-    email: currentStudent.email,
-    role: '',
-    status: 'pending',
-  });
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('ensemble_members').insert({
+      ensemble_id: e.id, user_id: authSession.user.id,
+      email: currentStudent.email, name: currentStudent.name,
+      role: 'student', status: 'pending',
+    });
+    if (error) { showToast('Could not send request: ' + error.message); return; }
+    e.joinRequests = [{ name: currentStudent.name, email: currentStudent.email, status: 'pending' }];
+  } else {
+    if(!e.joinRequests) e.joinRequests = [];
+    e.joinRequests.push({
+      name: currentStudent.name,
+      initials: currentStudent.initials,
+      email: currentStudent.email,
+      role: '',
+      status: 'pending',
+    });
+  }
   renderStudentLanding();
   showToast('Join request sent to ' + e.name + '!');
 }
@@ -3662,11 +3830,17 @@ function enterEnsembleAsStudent(idx) {
   renderStuSchedule();
 }
 
-function enterEnsemble(idx) {
+async function enterEnsemble(idx) {
   lastRole = 'teacher';
   activeEnsIdx = idx;
+  const e = ensembles[idx];
+
+  // Only a teacher of this ensemble can see the full roster (RLS); fetch
+  // it before rendering so students/joinRequests are populated by the
+  // time loadEnsembleContext() copies them onto the global arrays.
+  if (dataMode === 'live') await loadRosterFromDB(e);
+
   loadEnsembleContext();
-  const e = activeEns();
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -3674,8 +3848,8 @@ function enterEnsemble(idx) {
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
   const sel = document.getElementById('ens-select');
-  sel.innerHTML = ensembles.map((en,i) =>
-    `<option value="${i}" ${i===idx?'selected':''}>${en.name}</option>`).join('');
+  sel.innerHTML = teacherEnsembles().map(en => { const i = ensembles.indexOf(en);
+    return `<option value="${i}" ${i===idx?'selected':''}>${en.name}</option>`; }).join('');
   document.getElementById('role-toggle').style.display = 'flex';
 
   // Switch to teacher view
@@ -3693,12 +3867,12 @@ function enterEnsemble(idx) {
   renderResources();
 }
 
-function switchEnsemble(val) {
+async function switchEnsemble(val) {
   if(val === '__back__') { goLanding(); return; }
   saveEnsembleContext();
   // Switch as correct role
-  if(lastRole === 'student') enterEnsembleAsStudent(parseInt(val));
-  else enterEnsemble(parseInt(val));
+  if(lastRole === 'student') await enterEnsembleAsStudent(parseInt(val));
+  else await enterEnsemble(parseInt(val));
 }
 
 function goLanding() {
@@ -3745,29 +3919,50 @@ function wizStep(dir) {
   document.getElementById('wiz-finish-btn').style.display = wizCurrentStep === 3 ? 'inline-flex' : 'none';
 }
 
-function finishWizard() {
+async function finishWizard() {
   const name = document.getElementById('wiz-name').value.trim();
   if(!name) { alert('Please enter an ensemble name.'); wizStep(-2); return; }
 
-  const newEns = {
-    id: Date.now(),
-    name,
-    sub:   document.getElementById('wiz-sub').value.trim(),
-    term:  document.getElementById('wiz-term').value.trim(),
-    teacher: document.getElementById('wiz-teacher').value.trim(),
-    email: document.getElementById('wiz-email').value.trim(),
-    color: wizColor,
-    desc:  document.getElementById('wiz-desc').value.trim(),
-    schedule: document.getElementById('wiz-sched').value.trim(),
-    driveURL: document.getElementById('wiz-drive').value.trim(),
-    ...ensembleDefaults(),
-    pol: {
-      free:  parseInt(document.getElementById('wiz-free').value),
-      fail:  parseInt(document.getElementById('wiz-fail').value),
-      ded:   parseInt(document.getElementById('wiz-ded').value),
-      tardy: parseInt(document.querySelector('#wiz-tardy-btns .chip.on')?.dataset.v || 3),
-    },
+  const sub      = document.getElementById('wiz-sub').value.trim();
+  const term     = document.getElementById('wiz-term').value.trim();
+  const teacher  = document.getElementById('wiz-teacher').value.trim();
+  const email    = document.getElementById('wiz-email').value.trim();
+  const desc     = document.getElementById('wiz-desc').value.trim();
+  const schedule = document.getElementById('wiz-sched').value.trim();
+  const driveURL = document.getElementById('wiz-drive').value.trim();
+  const pol = {
+    free:  parseInt(document.getElementById('wiz-free').value),
+    fail:  parseInt(document.getElementById('wiz-fail').value),
+    ded:   parseInt(document.getElementById('wiz-ded').value),
+    tardy: parseInt(document.querySelector('#wiz-tardy-btns .chip.on')?.dataset.v || 3),
   };
+
+  let newEns;
+  if (dataMode === 'live') {
+    const { data: dbEns, error: ensErr } = await supabase.from('ensembles').insert({
+      name, sub, term, teacher_name: teacher, teacher_email: email,
+      color: wizColor, description: desc, schedule, drive_url: driveURL,
+      created_by: authSession.user.id,
+    }).select().single();
+    if (ensErr) { showToast('Could not create ensemble: ' + ensErr.message); return; }
+
+    const { error: memErr } = await supabase.from('ensemble_members').insert({
+      ensemble_id: dbEns.id, user_id: authSession.user.id, role: 'teacher', status: 'active',
+    });
+    if (memErr) { showToast('Ensemble created, but could not set you as its teacher: ' + memErr.message); }
+
+    newEns = mapDbEnsemble(dbEns, { role: 'teacher', status: 'active' });
+    newEns.pol = pol;
+    newEns.studentCount = 0;
+  } else {
+    // NB: ensembleDefaults() spreads *after* the fields above on purpose here —
+    // spreading it first would clobber wizColor/driveURL back to their defaults.
+    newEns = {
+      ...ensembleDefaults(),
+      id: Date.now(), name, sub, term, teacher, email,
+      color: wizColor, desc, schedule, driveURL, pol,
+    };
+  }
 
   ensembles.push(newEns);
   closeM('new-ensemble');
@@ -3804,29 +3999,48 @@ function renderJoinRequests() {
     </div>`).join('');
 }
 
-function approveJoin(email) {
+async function approveJoin(email) {
   const e = activeEns();
   const req = (e.joinRequests||[]).find(r=>r.email===email);
   if(!req) return;
-  req.status = 'approved';
-  if(!e.enrolledStudentEmails) e.enrolledStudentEmails = [];
-  e.enrolledStudentEmails.push(email);
-  // Add to roster if not already there
-  if(!students.find(s=>s.e===email)) {
-    const i = req.initials || req.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    students.push({n:req.name, i, r:req.role||'Ensemble', e:email, s:'present', t:'—', a:0});
-    e.students = JSON.parse(JSON.stringify(students));
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('ensemble_members')
+      .update({ status: 'active' }).eq('ensemble_id', e.id).eq('email', email);
+    if (error) { showToast('Could not approve: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
     document.getElementById('roster-count').textContent = students.length;
     renderRoster();
+  } else {
+    req.status = 'approved';
+    if(!e.enrolledStudentEmails) e.enrolledStudentEmails = [];
+    e.enrolledStudentEmails.push(email);
+    // Add to roster if not already there
+    if(!students.find(s=>s.e===email)) {
+      const i = req.initials || req.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      students.push({n:req.name, i, r:req.role||'Ensemble', e:email, s:'present', t:'—', a:0});
+      e.students = JSON.parse(JSON.stringify(students));
+      document.getElementById('roster-count').textContent = students.length;
+      renderRoster();
+    }
+    renderJoinRequests();
   }
-  renderJoinRequests();
   showToast(req.name + ' approved and added to roster!');
 }
 
-function denyJoin(email) {
+async function denyJoin(email) {
   const e = activeEns();
   const req = (e.joinRequests||[]).find(r=>r.email===email);
-  if(req) req.status = 'denied';
+  if(!req) return;
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('ensemble_members')
+      .update({ status: 'denied' }).eq('ensemble_id', e.id).eq('email', email);
+    if (error) { showToast('Could not deny: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    req.status = 'denied';
+  }
   renderJoinRequests();
   showToast('Request denied.');
 }
@@ -4082,9 +4296,12 @@ function showLoginCard() {
 }
 
 // Dev/demo shortcut — skips real auth. See "Skip for now (demo mode)" on the
-// check-email card. Leaves currentStudent.email at its mock default rather
-// than a real Supabase user, so ensemble/attendance data stays the seed data.
+// check-email card. Resets back to the seed data, so switching from a real
+// signed-in (live) session into demo mode never leaks DB-loaded ensembles.
 function bypassLogin() {
+  dataMode = 'demo';
+  ensembles = DEMO_ENSEMBLES;
+  activeEnsIdx = 0;
   enterApp();
 }
 
