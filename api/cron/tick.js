@@ -24,6 +24,31 @@ function renderTokens(text, values) {
   return out;
 }
 
+// events.event_date/start_time/end_time are unqualified wall-clock strings
+// (see migration 0009) — they mean whatever they mean in that ensemble's
+// timezone, not this server's. Converts one to a real UTC instant by
+// guessing UTC == the wall-clock value, then correcting by that guess's
+// actual offset from `tz`. One correction pass is exact except inside the
+// hour a DST transition happens in, which this app's 15-minute cron
+// granularity already treats as an acceptable margin.
+function zonedTimeToUtc(dateStr, timeStr, tz) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [h, mi] = (timeStr || '00:00').split(':').map(Number);
+  const guess = Date.UTC(y, mo - 1, d, h, mi, 0);
+  return new Date(guess - tzOffsetMinutes(new Date(guess), tz) * 60000);
+}
+
+function tzOffsetMinutes(date, tz) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+  const hour = parts.hour === '24' ? '00' : parts.hour;
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, hour, parts.minute, parts.second);
+  return (asUtc - date.getTime()) / 60000;
+}
+
 async function sendMail(to, subject, body) {
   try {
     await resend.emails.send({ from: 'Call Time <calltime@yourdomain.com>', to, subject, text: body });
@@ -53,24 +78,26 @@ export default async function handler(req, res) {
   return res.status(200).json(results);
 }
 
-// event_date/start_time/end_time have no timezone column (matching the
-// rest of the schema) — treated as server-local (UTC on Vercel), same
-// simplification the rest of this app makes everywhere else.
+// event_date/start_time/end_time carry no timezone of their own — they're
+// wall-clock strings meant in whatever timezone the event's ensemble is in
+// (ensembles.tz, migration 0009). The yesterday/today window here is
+// intentionally a day wider than needed in either direction: it's just a
+// cheap pre-filter so this doesn't scan every event ever created, and the
+// real "has it ended yet" check below is the tz-correct one.
 async function runAutoCheckout(now, results) {
   const yesterday = new Date(now.getTime() - 24 * 3600000).toISOString().slice(0, 10);
   const today = now.toISOString().slice(0, 10);
   const { data: events, error } = await supabase
     .from('events')
-    .select('id, event_date, end_time')
+    .select('id, event_date, end_time, ensembles(tz)')
     .gte('event_date', yesterday)
     .lte('event_date', today)
     .not('end_time', 'is', null);
   if (error) { results.errors.push('autoCheckout events: ' + error.message); return; }
 
   for (const ev of events || []) {
-    const [h, m] = ev.end_time.split(':').map(Number);
-    const endDt = new Date(ev.event_date + 'T00:00:00');
-    endDt.setHours(h, m, 0, 0);
+    const tz = ev.ensembles?.tz || 'America/Chicago';
+    const endDt = zonedTimeToUtc(ev.event_date, ev.end_time, tz);
     if (endDt > now) continue;
 
     const { data: rows, error: attErr } = await supabase
@@ -104,24 +131,29 @@ async function handleAfterAbsenceRule(rule, results) {
     .eq('ensemble_id', rule.ensemble_id).eq('key', rule.template_key).maybeSingle();
   if (!tplRow) return; // template was never saved for this ensemble — nothing to send
 
-  const [{ data: policy }, { data: members, error: mErr }, { data: absences, error: aErr }, { data: ensemble }] = await Promise.all([
+  const [{ data: policy }, { data: members, error: mErr }, { data: absences, error: aErr }, { data: excuses }, { data: ensemble }] = await Promise.all([
     supabase.from('grading_policies').select('*').eq('ensemble_id', rule.ensemble_id).maybeSingle(),
     supabase.from('ensemble_members').select('user_id, name, email')
       .eq('ensemble_id', rule.ensemble_id).eq('role', 'student').eq('status', 'active').not('user_id', 'is', null),
     supabase.from('attendance').select('user_id').eq('ensemble_id', rule.ensemble_id).eq('status', 'absent'),
+    supabase.from('excuses').select('user_id').eq('ensemble_id', rule.ensemble_id).eq('status', 'approved'),
     supabase.from('ensembles').select('*').eq('id', rule.ensemble_id).maybeSingle(),
   ]);
   if (mErr || aErr) { results.errors.push('after_absence: ' + (mErr || aErr).message); return; }
 
   const freeAbsences = policy?.free_absences ?? 2;
   const failThreshold = policy?.fail_threshold ?? 4;
+  const excludeExcused = policy?.exclude_excused_absences ?? true;
   const threshold = rule.template_key === 'failing' ? failThreshold : freeAbsences + 1;
 
   const countByUser = {};
   (absences || []).forEach(a => { countByUser[a.user_id] = (countByUser[a.user_id] || 0) + 1; });
+  const excusedByUser = {};
+  (excuses || []).forEach(x => { excusedByUser[x.user_id] = (excusedByUser[x.user_id] || 0) + 1; });
 
   for (const m of members || []) {
-    const count = countByUser[m.user_id] || 0;
+    const rawCount = countByUser[m.user_id] || 0;
+    const count = excludeExcused ? Math.max(0, rawCount - (excusedByUser[m.user_id] || 0)) : rawCount;
     if (count < threshold) continue;
 
     const { data: already } = await supabase.from('notification_log').select('id')
@@ -149,22 +181,23 @@ async function handleBeforeEventRule(rule, now, results) {
     .eq('ensemble_id', rule.ensemble_id).eq('key', rule.template_key).maybeSingle();
   if (!tplRow) return;
 
-  const today = now.toISOString().slice(0, 10);
+  // A day earlier than strictly needed, same reasoning as runAutoCheckout's
+  // window: cheap pre-filter, not the actual time check.
+  const yesterday = new Date(now.getTime() - 24 * 3600000).toISOString().slice(0, 10);
   const [{ data: events, error }, { data: members }, { data: ensemble }] = await Promise.all([
-    supabase.from('events').select('*').eq('ensemble_id', rule.ensemble_id).gte('event_date', today),
+    supabase.from('events').select('*').eq('ensemble_id', rule.ensemble_id).gte('event_date', yesterday),
     supabase.from('ensemble_members').select('user_id, name, email')
       .eq('ensemble_id', rule.ensemble_id).eq('role', 'student').eq('status', 'active').not('user_id', 'is', null),
     supabase.from('ensembles').select('*').eq('id', rule.ensemble_id).maybeSingle(),
   ]);
   if (error) { results.errors.push('before_event events: ' + error.message); return; }
 
+  const tz = ensemble?.tz || 'America/Chicago';
   const offsetMs = (rule.offset_value || 0) * (rule.offset_unit === 'hr' ? 3600000 : 60000);
 
   for (const ev of events || []) {
     if (!ev.start_time) continue;
-    const [h, m] = ev.start_time.split(':').map(Number);
-    const startDt = new Date(ev.event_date + 'T00:00:00');
-    startDt.setHours(h, m, 0, 0);
+    const startDt = zonedTimeToUtc(ev.event_date, ev.start_time, tz);
     const fireAt = new Date(startDt.getTime() - offsetMs);
     if (now < fireAt || now >= startDt) continue; // not time yet, or already started
 

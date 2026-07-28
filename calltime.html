@@ -707,6 +707,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:14px">
+        <div class="ctitle">Excused absences</div>
+        <div class="csub">When a student's excuse is approved, should that absence still count toward the free-absence/failing thresholds and grade deduction above?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="excused-chips">
+          <button class="chip on" data-v="exclude" onclick="selChip(this,'excused-chips');pol.excludeExcused=true;renderRoster();">Don't count toward grade</button>
+          <button class="chip" data-v="include" onclick="selChip(this,'excused-chips');pol.excludeExcused=false;renderRoster();">Count same as unexcused</button>
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px">
         <button class="btn btnp" onclick="saveGradingPolicy('cfm-grading')"><i class="ti ti-device-floppy"></i>Save</button>
         <button class="btn" onclick="resetGrading()"><i class="ti ti-refresh"></i>Reset defaults</button>
@@ -1723,6 +1732,15 @@ O Magnum Mysterium, Morten Lauridsen</textarea>
           <button class="chip" data-v="5" onclick="selChip(this,'wiz-tardy-btns')">5 tardies</button>
         </div>
       </div>
+
+      <div class="card">
+        <div class="ctitle">Excused absences</div>
+        <div class="csub">When a student's excuse is approved, should that absence still count toward the free-absence/failing thresholds and grade deduction above?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" id="wiz-excused-btns">
+          <button class="chip on" data-v="exclude" onclick="selChip(this,'wiz-excused-btns')">Don't count toward grade</button>
+          <button class="chip" data-v="include" onclick="selChip(this,'wiz-excused-btns')">Count same as unexcused</button>
+        </div>
+      </div>
     </div>
 
     <!-- STEP 3: Syllabus -->
@@ -1898,7 +1916,11 @@ async function sendMagicLink() {
   btn.style.opacity = '.6';
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
+    // from a QR scan — see genQR()/handleCheckinDeepLink()) so it survives
+    // the magic-link round trip instead of being dropped here before the
+    // email even goes out.
+    options: { emailRedirectTo: window.location.origin + window.location.pathname + window.location.search }
   });
   btn.disabled = false;
   btn.style.opacity = '1';
@@ -1969,7 +1991,7 @@ const tlData=[
   {l:'Main Stage Rehearsal',d:'May 2',s:'present',ex:null},
 ];
 let curExcId=null,upImgSrc='',upFile=null;
-let pol={free:2,fail:4,ded:5,tardy:3};
+let pol={free:2,fail:4,ded:5,tardy:3,excludeExcused:true};
 
 /* BADGES */
 function bdg(s){
@@ -2007,18 +2029,20 @@ function renderAll(){
 
 function renderRoster(){
   document.getElementById('roster-list').innerHTML=students.map(s=>{
-    const pct=Math.min(Math.round((s.a/pol.fail)*100),100);
-    const fill=s.a>=pol.fail?'#E24B4A':s.a>pol.free?'#EF9F27':'#63A322';
-    const over=Math.max(0,s.a-pol.free);const lost=over*pol.ded;
-    const g=s.a>=pol.fail?bdg('absent'):s.a>pol.free?bdg('late'):bdg('present');
+    const ga=gradedAbsences(s);
+    const pct=Math.min(Math.round((ga/pol.fail)*100),100);
+    const fill=ga>=pol.fail?'#E24B4A':ga>pol.free?'#EF9F27':'#63A322';
+    const over=Math.max(0,ga-pol.free);const lost=over*pol.ded;
+    const g=ga>=pol.fail?bdg('absent'):ga>pol.free?bdg('late'):bdg('present');
     const gn=lost>0?`<div style="font-size:11px;color:var(--am);margin-top:2px">−${lost}% grade</div>`:'';
+    const excusedNote=(pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
     return`<div class="trow">
       <div style="display:flex;align-items:center;gap:8px">
         <div class="avatar">${s.i}</div>
         <div><div style="font-size:13px;font-weight:500">${s.n}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
       </div>
       <div style="color:var(--t2)">${s.r}</div>
-      <div><strong>${s.a}</strong><span style="color:var(--t3)"> / ${pol.fail}</span>
+      <div><strong>${s.a}</strong><span style="color:var(--t3)"> / ${pol.fail}</span>${excusedNote}
         <div class="abar"><div class="afill" style="width:${pct}%;background:${fill}"></div></div></div>
       <div>${g}${gn}</div></div>`;
   }).join('');
@@ -2258,7 +2282,10 @@ async function decideExc(d){
       .eq('id', curExcId);
     if (error) { showToast('Could not save decision: ' + error.message); return; }
     const e = activeEns();
-    await loadExcusesFromDB(e);
+    // Reload the roster too, not just excuses — approving/denying changes
+    // the approved-excuse count loadRosterFromDB() feeds into aExcused,
+    // which gradedAbsences()/renderRoster() depend on.
+    await Promise.all([loadExcusesFromDB(e), loadRosterFromDB(e)]);
     loadEnsembleContext();
 
     // Fire-and-forget the approved/denied notice, using the excuse's own
@@ -2354,6 +2381,8 @@ function resetGrading(){
   document.getElementById('r-ded').value=5;document.getElementById('r-tardy').value=3;
   selChip(document.querySelector('#exc-win [data-v="48"]'),'exc-win');
   selChip(document.querySelector('#late-chips [data-v="10"]'),'late-chips');
+  selChip(document.querySelector('#excused-chips [data-v="exclude"]'),'excused-chips');
+  pol.excludeExcused = true;
   updPol();
 }
 
@@ -2361,6 +2390,7 @@ function mapDbGradingPolicy(row) {
   return {
     free: row.free_absences ?? 2, fail: row.fail_threshold ?? 4,
     ded: row.deduction_pct ?? 5, tardy: row.tardies_per_absence ?? 3,
+    excludeExcused: row.exclude_excused_absences ?? true,
     model: row.model || 'pct', letterStyle: row.letter_style || 'half',
     letterRules: row.letter_rules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}],
     lateWindow: row.late_window_min ?? 10, excWindow: row.excuse_window_hours ?? 48,
@@ -2372,7 +2402,7 @@ async function loadGradingPolicyFromDB(e) {
   if (error) { console.error(error); return; }
   if (!data) return; // never saved yet — ensembleDefaults()' pol/gradeModel/letterRules stand
   const mapped = mapDbGradingPolicy(data);
-  e.pol = { free: mapped.free, fail: mapped.fail, ded: mapped.ded, tardy: mapped.tardy };
+  e.pol = { free: mapped.free, fail: mapped.fail, ded: mapped.ded, tardy: mapped.tardy, excludeExcused: mapped.excludeExcused };
   e.gradeModel = mapped.model;
   e.letterRules = mapped.letterRules;
   // Read by syncGradingSettingsUI() below — not part of loadEnsembleContext's
@@ -2399,6 +2429,8 @@ function syncGradingSettingsUI(e) {
   if (excBtn) selChip(excBtn, 'exc-win');
   const letterBtn = document.querySelector(`#letter-style-btns [data-v="${e._letterStyle||'half'}"]`);
   if (letterBtn) selChip(letterBtn, 'letter-style-btns');
+  const excusedBtn = document.querySelector(`#excused-chips [data-v="${pol.excludeExcused === false ? 'include' : 'exclude'}"]`);
+  if (excusedBtn) selChip(excusedBtn, 'excused-chips');
 }
 
 async function saveGradingPolicy(id) {
@@ -2410,6 +2442,7 @@ async function saveGradingPolicy(id) {
     const { error } = await supabase.from('grading_policies').upsert({
       ensemble_id: e.id, model: gradeModel,
       free_absences: pol.free, fail_threshold: pol.fail, deduction_pct: pol.ded, tardies_per_absence: pol.tardy,
+      exclude_excused_absences: pol.excludeExcused,
       late_window_min: lateWindow, letter_style: letterStyle, letter_rules: letterRules, excuse_window_hours: excWindow,
     }, { onConflict: 'ensemble_id' });
     if (error) { showToast('Could not save grading policy: ' + error.message); return; }
@@ -2986,12 +3019,16 @@ function getReportData() {
     const present = s.s === 'present' ? 1 : 0;
     const late    = s.s === 'late'    ? 1 : 0;
     const absent  = s.a;
-    const excused = Math.floor(s.a * 0.3);
-    const unexcused = s.a - excused;
-    const over = Math.max(0, s.a - pol.free);
+    // Live mode: s.aExcused is a real count (see loadRosterFromDB()). Demo
+    // mode never had that data — keep its original fabricated 30% split
+    // rather than showing 0 excused for every demo student.
+    const excused = dataMode === 'live' ? (s.aExcused || 0) : Math.floor(s.a * 0.3);
+    const unexcused = Math.max(0, s.a - excused);
+    const ga = gradedAbsences(s);
+    const over = Math.max(0, ga - pol.free);
     const gradeImpact = over * pol.ded;
-    const atRisk = s.a >= pol.fail - 1;
-    const failing = s.a >= pol.fail;
+    const atRisk = ga >= pol.fail - 1;
+    const failing = ga >= pol.fail;
     return {n:s.n, i:s.i, r:s.r, present, late, absent, excused, unexcused, gradeImpact, atRisk, failing};
   });
 }
@@ -4137,7 +4174,7 @@ const ensembleDefaults = () => ({
   logData: [],
   resources: [],
   driveURL: '',
-  pol: {free:2, fail:4, ded:5, tardy:3},
+  pol: {free:2, fail:4, ded:5, tardy:3, excludeExcused:true},
   rules: [
     {id:1,on:true, lbl:'Absence notice',     trig:'end_of_event',  off:0,unit:'min',tpl:'absence'},
     {id:2,on:true, lbl:'Absence warning',    trig:'after_absence', off:0,unit:'min',tpl:'warning'},
@@ -4250,6 +4287,7 @@ function mapDbEnsemble(dbEns, myMembership) {
     desc: dbEns.description || '',
     schedule: dbEns.schedule || '',
     driveURL: dbEns.drive_url || '',
+    tz: dbEns.tz || 'America/Chicago',
     createdBy: dbEns.created_by,
     myRole: myMembership ? myMembership.role : null,
     myStatus: myMembership ? myMembership.status : null,
@@ -4261,9 +4299,21 @@ function mapDbEnsemble(dbEns, myMembership) {
   };
 }
 
-function mapMemberToStudent(m, absenceCount) {
+function mapMemberToStudent(m, absenceCount, excusedCount) {
   const name = m.name || nameFromEmail(m.email);
-  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—', a: absenceCount || 0, memberId: m.id, userId: m.user_id };
+  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—',
+    a: absenceCount || 0, aExcused: excusedCount || 0, memberId: m.id, userId: m.user_id };
+}
+
+// The number of absences that actually count against the free-absence/
+// failing thresholds and grade deduction — total absences minus approved-
+// excuse absences, when the policy excludes those (the default; see the
+// wizard's "Excused absences" step / Settings > Grading). s.aExcused is
+// only ever populated in live mode (loadRosterFromDB()); demo-mode
+// students don't have it, so this is just s.a there regardless of the
+// toggle — no observable change to demo mode.
+function gradedAbsences(s) {
+  return pol.excludeExcused ? Math.max(0, (s.a||0) - (s.aExcused||0)) : (s.a||0);
 }
 
 function mapMemberToJoinRequest(m) {
@@ -4277,16 +4327,21 @@ function mapMemberToJoinRequest(m) {
 // (ensemble_members.absences is never written to — deriving it here means
 // it can never drift out of sync with what actually happened at check-in).
 async function loadRosterFromDB(e) {
-  const [membersRes, absenceRes] = await Promise.all([
+  const [membersRes, absenceRes, excusedRes] = await Promise.all([
     supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id),
     supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
+    // Approved-excuse count per student — feeds gradedAbsences() below when
+    // the policy excludes excused absences from the grade math.
+    supabase.from('excuses').select('user_id').eq('ensemble_id', e.id).eq('status', 'approved'),
   ]);
   if (membersRes.error) { console.error(membersRes.error); showToast('Could not load roster: ' + membersRes.error.message); return; }
   const rows = membersRes.data || [];
   const absenceCounts = {};
   (absenceRes.data || []).forEach(a => { absenceCounts[a.user_id] = (absenceCounts[a.user_id]||0) + 1; });
+  const excusedCounts = {};
+  (excusedRes.data || []).forEach(x => { excusedCounts[x.user_id] = (excusedCounts[x.user_id]||0) + 1; });
   e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
-    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0));
+    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0));
   e.joinRequests = rows.filter(m => m.role === 'student' && m.status !== 'active').map(mapMemberToJoinRequest);
 }
 
@@ -4422,16 +4477,21 @@ async function upsertEventToDB(fields, existingId) {
 }
 
 // Expands the New Event modal's recurrence controls into real dates.
-// Presets with no end-date UI at all (weekly/monwed/mwf) are capped at 12
-// weeks — roughly a semester of 1-3x/week rehearsals — and "custom" with
-// "never" as its end condition is capped at 52 occurrences. Both are just
-// guardrails against an unbounded insert, not a real "ends never" feature.
+// Presets with no end-date UI at all (weekly/monwed/mwf) are capped at a
+// full semester (16 weeks); "custom" with "never" as its end condition is
+// capped at 52 occurrences instead — a count, not a week span, since a
+// custom recurrence's interval/unit can be anything (every day, every 3
+// months, ...) and "16 weeks" isn't a meaningful bound for all of those.
+// Both are just guardrails against an unbounded insert, not a real "ends
+// never" feature.
+const SEMESTER_WEEKS = 16;
+
 function computeRecurrenceDates(startDate, recurSel) {
   if (recurSel === 'none' || !recurSel) return [startDate];
 
   if (recurSel === 'weekly') {
     const dates = [];
-    for (let i = 0; i < 12; i++) dates.push(new Date(startDate.getTime() + i*7*86400000));
+    for (let i = 0; i < SEMESTER_WEEKS; i++) dates.push(new Date(startDate.getTime() + i*7*86400000));
     return dates;
   }
 
@@ -4439,7 +4499,7 @@ function computeRecurrenceDates(startDate, recurSel) {
     const wantDays = recurSel === 'monwed' ? [1,3] : [1,3,5];
     const dates = [];
     let d = new Date(startDate);
-    const endBound = new Date(startDate.getTime() + 12*7*86400000);
+    const endBound = new Date(startDate.getTime() + SEMESTER_WEEKS*7*86400000);
     while (d <= endBound) {
       if (wantDays.includes(d.getDay())) dates.push(new Date(d));
       d = new Date(d.getTime() + 86400000);
@@ -4625,7 +4685,7 @@ function loadEnsembleContext() {
   logData.length = 0;  logData.push(...(e.logData||[]));
   resources.length = 0; resources.push(...(e.resources||[]));
   driveURL = e.driveURL || '';
-  pol = {...(e.pol || {free:2,fail:4,ded:5,tardy:3})};
+  pol = {...(e.pol || {free:2,fail:4,ded:5,tardy:3,excludeExcused:true})};
   rules = JSON.parse(JSON.stringify(e.rules || []));
   tpls = JSON.parse(JSON.stringify(e.tpls || defTpls));
   customTpls = JSON.parse(JSON.stringify(e.customTpls || {}));
@@ -4970,6 +5030,7 @@ async function finishWizard() {
     fail:  parseInt(document.getElementById('wiz-fail').value),
     ded:   parseInt(document.getElementById('wiz-ded').value),
     tardy: parseInt(document.querySelector('#wiz-tardy-btns .chip.on')?.dataset.v || 3),
+    excludeExcused: (document.querySelector('#wiz-excused-btns .chip.on')?.dataset.v || 'exclude') === 'exclude',
   };
 
   let newEns;
@@ -4978,6 +5039,12 @@ async function finishWizard() {
       name, sub, term, teacher_name: teacher, teacher_email: email,
       color: wizColor, description: desc, schedule, drive_url: driveURL,
       created_by: authSession.user.id,
+      // The teacher creating this ensemble is presumably at the venue —
+      // captures the browser's IANA zone so api/cron/tick.js can convert
+      // this ensemble's event_date/start_time/end_time (unqualified wall-clock
+      // strings) to real UTC instants instead of treating them as its own
+      // server-local (UTC) time.
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago',
     }).select().single();
     if (ensErr) { showToast('Could not create ensemble: ' + ensErr.message); return; }
 
@@ -4985,6 +5052,17 @@ async function finishWizard() {
       ensemble_id: dbEns.id, user_id: authSession.user.id, role: 'teacher', status: 'active',
     });
     if (memErr) { showToast('Ensemble created, but could not set you as its teacher: ' + memErr.message); }
+
+    // Persist the grading policy collected in step 2 — previously this only
+    // lived in newEns.pol locally until (if ever) the teacher separately
+    // opened Settings > Grading and clicked Save, which meant "decide this
+    // in the wizard" silently didn't stick for the excused-absences choice
+    // (or free/fail/ded/tardy) until then.
+    const { error: gpErr } = await supabase.from('grading_policies').insert({
+      ensemble_id: dbEns.id, free_absences: pol.free, fail_threshold: pol.fail,
+      deduction_pct: pol.ded, tardies_per_absence: pol.tardy, exclude_excused_absences: pol.excludeExcused,
+    });
+    if (gpErr) { showToast('Ensemble created, but could not save the grading policy: ' + gpErr.message); }
 
     newEns = mapDbEnsemble(dbEns, { role: 'teacher', status: 'active' });
     newEns.pol = pol;

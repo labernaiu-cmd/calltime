@@ -68,6 +68,19 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    up the Vercel Cron job (root `README.md` §3). Dedupes the two
    timer-based notification rules so they don't re-email the same student
    on every cron tick.
+8. `migrations/0008_exclude_excused_absences.sql` — adds
+   `grading_policies.exclude_excused_absences` (default `true`), the
+   setting behind the wizard's "Excused absences" step and Settings >
+   Grading's matching toggle: whether an approved excuse removes that
+   absence from the free-absence/failing-threshold and grade-deduction
+   math, or counts the same as an unexcused one.
+9. `migrations/0009_ensemble_timezone.sql` — adds `ensembles.tz` (IANA
+   name, default `'America/Chicago'`), captured from the creating
+   teacher's browser when they finish the setup wizard.
+   `events.event_date`/`start_time`/`end_time` stay unqualified wall-clock
+   strings, but `api/cron/tick.js` needs to know what timezone those
+   strings are *in* to correctly compare them against its own (UTC, on
+   Vercel) clock — see `zonedTimeToUtc()` there.
 
 ## 3. Enable email auth
 
@@ -91,4 +104,8 @@ the RLS policies above grant it.
 
 Also add your deployed URL (or `http://localhost:...` while developing)
 to **Authentication → URL Configuration → Redirect URLs**, since magic
-links only redirect back to allow-listed URLs.
+links only redirect back to allow-listed URLs. Use a wildcard suffix (e.g.
+`https://yourapp.vercel.app/calltime.html*`) rather than the bare URL —
+the QR check-in flow appends `?checkin=<eventId>&ensemble=<ensembleId>` to
+the redirect target (see `handleCheckinDeepLink()` in `calltime.html`),
+and an exact-match entry without the `*` will reject that redirect.

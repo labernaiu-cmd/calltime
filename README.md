@@ -114,26 +114,18 @@ links only redirect to allow-listed URLs) — see `supabase/README.md` §4.
 
 Kept out of scope rather than half-built:
 
-- **QR check-in** (live mode) encodes a real link back to this app
-  (`?checkin=<eventId>&ensemble=<ensembleId>`) that routes a signed-in
-  student straight to that ensemble's check-in ring — but it does not
-  auto-tap the ring for them. If they aren't signed in yet, they land on
-  the login screen and the deep link is lost; there's no "resume after
-  sign-in" for it. Demo mode's QR still encodes the original mockup's fake
-  `calltime.app` URL, unchanged.
-- **Excuse decisions don't recompute a letter grade** — approving/denying
-  updates the excuse's own status, and the roster's absence count is
-  always a live count from real `attendance` rows (so it's never stale),
-  but nothing converts "excused" into a change to letter-grade math for
-  the `letter` grading model. The `pct` model's deduction calculation
-  already reads live absence counts, for what that's worth.
+- **Excuse decisions don't recompute a *letter* grade** — approving a
+  student's excuse now correctly removes that absence from the `pct`
+  model's free-absence/failing-threshold/deduction math (or not, per the
+  wizard/Settings > Grading "Excused absences" toggle — see
+  `gradedAbsences()`), and the roster's absence count is always a live
+  count from real `attendance` rows so it's never stale. But selecting the
+  `letter` grading model in Settings only changes what the settings tab
+  itself shows (`letterRules`) — nothing in `renderRoster()`/
+  `getReportData()` branches on `gradeModel` to actually apply
+  letter-grade math to a real student, excused absences or otherwise.
 - **Recurring events, weekly/Mon-Wed/Mon-Wed-Fri presets**, are capped at
-  12 weeks and **custom recurrence with "never" as its end** is capped at
-  52 occurrences — both are guardrails against an unbounded insert, not a
-  real "repeats forever" feature. See `computeRecurrenceDates()`.
-- **Timezones**: `events.event_date`/`start_time`/`end_time` have no
-  timezone column, so `api/cron/tick.js` (and the browser everywhere else)
-  treats them as local to whatever machine is reading them — the server's
-  UTC clock for the cron job, the visitor's local time in the browser.
-  Fine for a single-timezone program; would need a real timezone column to
-  be correct across timezones.
+  16 weeks (`SEMESTER_WEEKS` — a semester) and **custom recurrence with
+  "never" as its end** is capped at 52 occurrences instead — both are
+  guardrails against an unbounded insert, not a real "repeats forever"
+  feature. See `computeRecurrenceDates()`.
