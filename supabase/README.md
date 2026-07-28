@@ -81,6 +81,12 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    strings, but `api/cron/tick.js` needs to know what timezone those
    strings are *in* to correctly compare them against its own (UTC, on
    Vercel) clock — see `zonedTimeToUtc()` there.
+10. `migrations/0010_points_grading_model.sql` — adds
+    `grading_policies.points_total`/`points_per_event`/`points_mode`, a
+    third grading model (alongside `pct`/`letter`) selected in Settings >
+    Grading: a points pool a student either has deducted from per absence
+    or earns toward per rehearsal attended. See `pointsBalance()` in
+    `calltime.html`.
 
 ## 3. Enable email auth
 

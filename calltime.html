@@ -603,7 +603,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="card" style="margin-bottom:14px">
         <div class="ctitle">Grading model</div>
         <div class="csub">Choose how absences affect the final grade for this ensemble.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="grade-model-btns">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="grade-model-btns">
           <div class="grade-model-card on" id="gm-pct" onclick="selectGradeModel('pct')">
             <div style="font-size:15px;margin-bottom:4px">📉</div>
             <div style="font-size:13px;font-weight:600">Percentage deduction</div>
@@ -614,11 +614,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <div style="font-size:13px;font-weight:600">Letter grade drop</div>
             <div style="font-size:11px;color:var(--t2);margin-top:3px">e.g. drop a half or full letter after N absences</div>
           </div>
+          <div class="grade-model-card" id="gm-points" onclick="selectGradeModel('points')">
+            <div style="font-size:15px;margin-bottom:4px">🎯</div>
+            <div style="font-size:13px;font-weight:600">Points pool</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:3px">e.g. 1000 points total, ±5 per rehearsal</div>
+          </div>
         </div>
       </div>
 
-      <!-- SHARED: Absence limits -->
-      <div class="card" style="margin-bottom:14px">
+      <!-- SHARED: Absence limits (pct/letter only — the points pool doesn't use a free-absence grace period, the pool size itself is the cushion) -->
+      <div class="card" style="margin-bottom:14px" id="grading-limits-card">
         <div class="ctitle">Absence limits</div>
         <div class="csub">Free absences before penalty, and the threshold for failing risk.</div>
         <div style="display:flex;gap:14px">
@@ -675,6 +680,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="card" style="margin-bottom:14px;background:var(--pbg);border-color:#AFA9EC">
           <div style="font-size:12px;font-weight:600;color:var(--ptx);margin-bottom:8px">Example — starting grade A</div>
           <div id="letter-preview" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+      </div>
+
+      <!-- POINTS MODEL -->
+      <div id="grading-points-section" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div class="ctitle">Points pool</div>
+          <div class="csub">Total points a student can have, and what one rehearsal is worth.</div>
+          <div style="display:flex;gap:14px;margin-bottom:14px">
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Total points</label>
+              <input type="number" min="1" value="1000" id="r-points-total" oninput="updPoints()"
+                style="width:100%;padding:8px 10px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:14px"/>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Points per rehearsal</label>
+              <input type="number" min="1" value="5" id="r-points-per-event" oninput="updPoints()"
+                style="width:100%;padding:8px 10px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:14px"/>
+            </div>
+          </div>
+          <div style="font-size:13px;color:var(--t2);margin-bottom:8px">A student's grade is their point balance:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" id="points-mode-chips">
+            <button class="chip on" data-v="deduct" onclick="selChip(this,'points-mode-chips');updPoints()">Deducted from the pool per absence</button>
+            <button class="chip" data-v="earn" onclick="selChip(this,'points-mode-chips');updPoints()">Earned toward the pool per rehearsal attended</button>
+          </div>
+          <div id="points-prev" style="background:var(--s2);border-radius:var(--rs);padding:10px 12px;font-size:13px;color:var(--t2);line-height:1.6"></div>
         </div>
       </div>
 
@@ -1992,6 +2023,7 @@ const tlData=[
 ];
 let curExcId=null,upImgSrc='',upFile=null;
 let pol={free:2,fail:4,ded:5,tardy:3,excludeExcused:true};
+let pointsTotal=1000, pointsPerEvent=5, pointsMode='deduct'; // gradeModel==='points'
 
 /* BADGES */
 function bdg(s){
@@ -2029,19 +2061,35 @@ function renderAll(){
 
 function renderRoster(){
   document.getElementById('roster-list').innerHTML=students.map(s=>{
-    const ga=gradedAbsences(s);
-    const pct=Math.min(Math.round((ga/pol.fail)*100),100);
-    const fill=ga>=pol.fail?'#E24B4A':ga>pol.free?'#EF9F27':'#63A322';
-    const over=Math.max(0,ga-pol.free);const lost=over*pol.ded;
-    const g=ga>=pol.fail?bdg('absent'):ga>pol.free?bdg('late'):bdg('present');
-    const gn=lost>0?`<div style="font-size:11px;color:var(--am);margin-top:2px">−${lost}% grade</div>`:'';
-    const excusedNote=(pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
-    return`<div class="trow">
-      <div style="display:flex;align-items:center;gap:8px">
+    const head = `<div style="display:flex;align-items:center;gap:8px">
         <div class="avatar">${s.i}</div>
         <div><div style="font-size:13px;font-weight:500">${s.n}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
       </div>
-      <div style="color:var(--t2)">${s.r}</div>
+      <div style="color:var(--t2)">${s.r}</div>`;
+
+    if (gradeModel === 'points') {
+      const bal=pointsBalance(s);
+      const pct=Math.min(100,Math.round((bal/pointsTotal)*100));
+      const fill=pct<50?'#E24B4A':pct<80?'#EF9F27':'#63A322';
+      const g=pct<50?bdg('absent'):pct<80?bdg('late'):bdg('present');
+      // Excused count is only meaningful here in deduct mode (it's the
+      // count of absences the policy chose not to charge points for) —
+      // earn mode never touches it, since only actual attendance earns.
+      const excusedNote=(pointsMode==='deduct' && pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
+      return`<div class="trow">${head}
+      <div><strong>${bal}</strong><span style="color:var(--t3)"> / ${pointsTotal}</span>${excusedNote}
+        <div class="abar"><div class="afill" style="width:${pct}%;background:${fill}"></div></div></div>
+      <div>${g}</div></div>`;
+    }
+
+    const ga=gradedAbsences(s);
+    const pct=Math.min(Math.round((ga/pol.fail)*100),100);
+    const fill=ga>=pol.fail?'#E24B4A':ga>pol.free?'#EF9F27':'#63A322';
+    const score=Math.max(0,100-Math.max(0,ga-pol.free)*pol.ded);
+    const g=ga>=pol.fail?bdg('absent'):ga>pol.free?bdg('late'):bdg('present');
+    const gn=score<100?`<div style="font-size:11px;color:var(--am);margin-top:2px">${score} grade</div>`:'';
+    const excusedNote=(pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
+    return`<div class="trow">${head}
       <div><strong>${s.a}</strong><span style="color:var(--t3)"> / ${pol.fail}</span>${excusedNote}
         <div class="abar"><div class="afill" style="width:${pct}%;background:${fill}"></div></div></div>
       <div>${g}${gn}</div></div>`;
@@ -2372,10 +2420,24 @@ function updPol(){
   document.getElementById('v-ded').textContent=ded+'%';
   document.getElementById('v-tardy').textContent=tardy===1?'1 tardy = 1 absence':tardy+' tardies = 1 absence';
   document.getElementById('pol-prev').innerHTML=free===0?`Every absence deducts <strong>${ded}%</strong>. Failing risk at <strong>${fail}</strong> absences.`:`First <strong>${free}</strong> absence${free>1?'s':''} are free. Each additional deducts <strong>${ded}%</strong>. Failing risk at <strong>${fail}</strong> absences.`;
-  document.getElementById('ded-ex').innerHTML=[free+1,free+2,free+3].filter(n=>n<=fail).map(n=>`<span class="gex"><i class="ti ti-minus" style="font-size:11px;color:var(--rd)"></i>${n} abs → −${(n-free)*ded}%</span>`).join('');
-  pol={free,fail,ded,tardy};renderRoster();
+  document.getElementById('ded-ex').innerHTML=[free+1,free+2,free+3].filter(n=>n<=fail).map(n=>`<span class="gex"><i class="ti ti-minus" style="font-size:11px;color:var(--rd)"></i>${n} abs → ${Math.max(0,100-(n-free)*ded)}</span>`).join('');
+  // Preserve excludeExcused — it's set directly by the excused-chips
+  // buttons, not read from a slider here, so a plain {free,fail,ded,tardy}
+  // would silently wipe it back to undefined on the next slider move.
+  pol={free,fail,ded,tardy,excludeExcused:pol.excludeExcused};renderRoster();
 }
 function selChip(btn,grp){document.querySelectorAll('#'+grp+' .chip').forEach(b=>b.classList.remove('on'));btn.classList.add('on')}
+
+function updPoints(){
+  pointsTotal=Math.max(1,parseInt(document.getElementById('r-points-total').value)||1000);
+  pointsPerEvent=Math.max(1,parseInt(document.getElementById('r-points-per-event').value)||5);
+  pointsMode=document.querySelector('#points-mode-chips .chip.on')?.dataset.v||'deduct';
+  document.getElementById('points-prev').innerHTML = pointsMode==='deduct'
+    ? `Every student starts at <strong>${pointsTotal}</strong>. Each absence beyond an approved excuse costs <strong>${pointsPerEvent}</strong> points.`
+    : `Every student starts at <strong>0</strong>. Each rehearsal attended earns <strong>${pointsPerEvent}</strong> points, up to <strong>${pointsTotal}</strong>.`;
+  renderRoster();
+}
+
 function resetGrading(){
   document.getElementById('r-free').value=2;document.getElementById('r-fail').value=4;
   document.getElementById('r-ded').value=5;document.getElementById('r-tardy').value=3;
@@ -2383,7 +2445,11 @@ function resetGrading(){
   selChip(document.querySelector('#late-chips [data-v="10"]'),'late-chips');
   selChip(document.querySelector('#excused-chips [data-v="exclude"]'),'excused-chips');
   pol.excludeExcused = true;
+  document.getElementById('r-points-total').value=1000;
+  document.getElementById('r-points-per-event').value=5;
+  selChip(document.querySelector('#points-mode-chips [data-v="deduct"]'),'points-mode-chips');
   updPol();
+  updPoints();
 }
 
 function mapDbGradingPolicy(row) {
@@ -2394,6 +2460,8 @@ function mapDbGradingPolicy(row) {
     model: row.model || 'pct', letterStyle: row.letter_style || 'half',
     letterRules: row.letter_rules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}],
     lateWindow: row.late_window_min ?? 10, excWindow: row.excuse_window_hours ?? 48,
+    pointsTotal: row.points_total ?? 1000, pointsPerEvent: row.points_per_event ?? 5,
+    pointsMode: row.points_mode || 'deduct',
   };
 }
 
@@ -2405,6 +2473,9 @@ async function loadGradingPolicyFromDB(e) {
   e.pol = { free: mapped.free, fail: mapped.fail, ded: mapped.ded, tardy: mapped.tardy, excludeExcused: mapped.excludeExcused };
   e.gradeModel = mapped.model;
   e.letterRules = mapped.letterRules;
+  e.pointsTotal = mapped.pointsTotal;
+  e.pointsPerEvent = mapped.pointsPerEvent;
+  e.pointsMode = mapped.pointsMode;
   // Read by syncGradingSettingsUI() below — not part of loadEnsembleContext's
   // swap since there's no dedicated global for them, only DOM chip state.
   e._lateWindow = mapped.lateWindow;
@@ -2422,7 +2493,11 @@ function syncGradingSettingsUI(e) {
   document.getElementById('r-ded').value = pol.ded;
   document.getElementById('r-tardy').value = pol.tardy;
   updPol();
-  selectGradeModel(gradeModel);
+  document.getElementById('r-points-total').value = pointsTotal;
+  document.getElementById('r-points-per-event').value = pointsPerEvent;
+  const modeBtn = document.querySelector(`#points-mode-chips [data-v="${pointsMode}"]`);
+  if (modeBtn) selChip(modeBtn, 'points-mode-chips');
+  selectGradeModel(gradeModel); // also runs updPoints() off the values just set above
   const lateBtn = document.querySelector(`#late-chips [data-v="${e._lateWindow||10}"]`);
   if (lateBtn) selChip(lateBtn, 'late-chips');
   const excBtn = document.querySelector(`#exc-win [data-v="${e._excWindow||48}"]`);
@@ -2444,6 +2519,7 @@ async function saveGradingPolicy(id) {
       free_absences: pol.free, fail_threshold: pol.fail, deduction_pct: pol.ded, tardies_per_absence: pol.tardy,
       exclude_excused_absences: pol.excludeExcused,
       late_window_min: lateWindow, letter_style: letterStyle, letter_rules: letterRules, excuse_window_hours: excWindow,
+      points_total: pointsTotal, points_per_event: pointsPerEvent, points_mode: pointsMode,
     }, { onConflict: 'ensemble_id' });
     if (error) { showToast('Could not save grading policy: ' + error.message); return; }
   }
@@ -3025,11 +3101,18 @@ function getReportData() {
     const excused = dataMode === 'live' ? (s.aExcused || 0) : Math.floor(s.a * 0.3);
     const unexcused = Math.max(0, s.a - excused);
     const ga = gradedAbsences(s);
-    const over = Math.max(0, ga - pol.free);
-    const gradeImpact = over * pol.ded;
-    const atRisk = ga >= pol.fail - 1;
-    const failing = ga >= pol.fail;
-    return {n:s.n, i:s.i, r:s.r, present, late, absent, excused, unexcused, gradeImpact, atRisk, failing};
+    let score, scoreMax, atRisk, failing;
+    if (gradeModel === 'points') {
+      score = pointsBalance(s); scoreMax = pointsTotal;
+      atRisk = score < scoreMax * 0.5; failing = score <= 0;
+    } else {
+      score = Math.max(0, 100 - Math.max(0, ga - pol.free) * pol.ded); scoreMax = 100;
+      atRisk = ga >= pol.fail - 1; failing = ga >= pol.fail;
+    }
+    // The number shown in place of the old "−15%" deduction — the resulting
+    // grade/balance itself, not how much was taken off it.
+    const scoreLabel = gradeModel === 'points' ? `${score} / ${scoreMax}` : String(score);
+    return {n:s.n, i:s.i, r:s.r, present, late, absent, excused, unexcused, score, scoreMax, scoreLabel, atRisk, failing};
   });
 }
 
@@ -3056,7 +3139,7 @@ function renderReportModal() {
         <div style="flex:1"><div style="font-size:13px;font-weight:500">${r.n}</div><div style="font-size:11px;color:var(--t2)">${r.r}</div></div>
         <div style="text-align:right">
           <div style="font-size:13px;font-weight:600;color:${r.failing?'var(--rd)':'var(--am)'}">${r.absent} absences</div>
-          ${r.gradeImpact>0?`<div style="font-size:11px;color:var(--am)">−${r.gradeImpact}% grade</div>`:''}
+          ${r.score<r.scoreMax?`<div style="font-size:11px;color:var(--am)">${r.scoreLabel} grade</div>`:''}
         </div>
         ${r.failing?'<span class="badge br">Failing risk</span>':'<span class="badge ba">Warning</span>'}
       </div>`).join('');
@@ -3066,7 +3149,11 @@ function renderReportModal() {
   }
 
   document.getElementById('rep-list').innerHTML = data.map(r=>{
-    const pct = Math.min(Math.round((r.absent/pol.fail)*100),100);
+    // How much of the grade/pool has been lost, as a bar-fill fraction —
+    // works the same way for the pct model (100-score)/100 and the points
+    // model (total-balance)/total, unlike the old absent/pol.fail ratio
+    // which only made sense for the pct model.
+    const pct = Math.min(100,Math.max(0,Math.round((1-r.score/r.scoreMax)*100)));
     const fill = r.failing?'#E24B4A':r.atRisk?'#EF9F27':'#63A322';
     return `<div style="display:grid;grid-template-columns:2fr 0.6fr 0.6fr 0.6fr 1fr;gap:8px;padding:9px 0;border-bottom:.5px solid var(--bd);align-items:center">
       <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:26px;height:26px;font-size:9px">${r.i}</div><div style="font-size:13px;font-weight:500">${r.n}</div></div>
@@ -3074,8 +3161,8 @@ function renderReportModal() {
       <div style="font-size:12px;color:var(--am);text-align:center;font-weight:500">${r.late}</div>
       <div style="font-size:12px;color:var(--rd);text-align:center;font-weight:600">${r.absent}</div>
       <div>
-        <div style="display:flex;justify-content:flex-end;font-size:11px;color:${r.gradeImpact>0?'var(--am)':'var(--t3)'}">
-          ${r.gradeImpact>0?'−'+r.gradeImpact+'%':'-'}
+        <div style="display:flex;justify-content:flex-end;font-size:11px;color:${r.score<r.scoreMax?'var(--am)':'var(--t3)'}">
+          ${r.scoreLabel}
         </div>
         <div style="height:4px;background:var(--s2);border-radius:2px;margin-top:3px;overflow:hidden">
           <div style="height:100%;border-radius:2px;width:${pct}%;background:${fill}"></div>
@@ -3106,7 +3193,7 @@ function renderReportTab() {
 
   document.getElementById('report-table').innerHTML = sorted.map(r => {
     const fill = r.failing?'#E24B4A':r.atRisk?'#EF9F27':'#63A322';
-    const pct = Math.min(Math.round((r.absent/pol.fail)*100),100);
+    const pct = Math.min(100,Math.max(0,Math.round((1-r.score/r.scoreMax)*100)));
     return `<div style="display:grid;grid-template-columns:2fr 0.7fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr;gap:0;padding:11px 16px;border-bottom:.5px solid var(--bd);align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
         <div class="avatar" style="width:28px;height:28px;font-size:10px">${r.i}</div>
@@ -3118,8 +3205,8 @@ function renderReportTab() {
       <div style="font-size:13px;color:var(--gn);text-align:center">${r.excused}</div>
       <div style="font-size:13px;color:var(--rd);text-align:center">${r.unexcused}</div>
       <div style="text-align:right">
-        <div style="font-size:12px;font-weight:600;color:${r.gradeImpact>0?'var(--am)':'var(--t3)'}">
-          ${r.gradeImpact>0?'−'+r.gradeImpact+'%':'-'}
+        <div style="font-size:12px;font-weight:600;color:${r.score<r.scoreMax?'var(--am)':'var(--t3)'}">
+          ${r.scoreLabel}
         </div>
         <div style="height:4px;background:var(--s2);border-radius:2px;margin-top:4px;overflow:hidden">
           <div style="height:100%;border-radius:2px;width:${pct}%;background:${fill}"></div>
@@ -3138,8 +3225,8 @@ function sortReport(key) {
 function exportCSV() {
   const data = getReportData();
   const rows = [
-    ['Name','Role','Present','Late','Absent','Excused','Unexcused','Grade Impact'],
-    ...data.map(r=>[r.n,r.r,r.present,r.late,r.absent,r.excused,r.unexcused,r.gradeImpact>0?'-'+r.gradeImpact+'%':'-'])
+    ['Name','Role','Present','Late','Absent','Excused','Unexcused','Grade'],
+    ...data.map(r=>[r.n,r.r,r.present,r.late,r.absent,r.excused,r.unexcused,r.scoreLabel])
   ];
   const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv'});
@@ -3161,7 +3248,7 @@ function exportPDF() {
       <td style="padding:8px 12px;text-align:center;font-weight:700;color:#A32D2D">${r.absent}</td>
       <td style="padding:8px 12px;text-align:center;color:#3B6D11">${r.excused}</td>
       <td style="padding:8px 12px;text-align:center;color:#A32D2D">${r.unexcused}</td>
-      <td style="padding:8px 12px;text-align:right;color:${r.gradeImpact>0?'#854F0B':'#999'}">${r.gradeImpact>0?'-'+r.gradeImpact+'%':'-'}</td>
+      <td style="padding:8px 12px;text-align:right;color:${r.score<r.scoreMax?'#854F0B':'#999'}">${r.scoreLabel}</td>
     </tr>`).join('');
 
   const win = window.open('','_blank');
@@ -3180,7 +3267,7 @@ function exportPDF() {
   <div class="risk-names">${atRisk.map(r=>r.n+' ('+r.absent+' abs)').join(' · ')}</div></div>`:''}
   <table><thead><tr>
     <th>Name</th><th>Role</th><th class="num">Present</th><th class="num">Late</th>
-    <th class="num">Absent</th><th class="num">Excused</th><th class="num">Unexcused</th><th style="text-align:right">Grade impact</th>
+    <th class="num">Absent</th><th class="num">Excused</th><th class="num">Unexcused</th><th style="text-align:right">Grade</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div class="footer">Call Time · Exported by teacher · ${students.length} students · ${data.reduce((s,r)=>s+r.absent,0)} total absences</div>
   </body></html>`);
@@ -4299,10 +4386,10 @@ function mapDbEnsemble(dbEns, myMembership) {
   };
 }
 
-function mapMemberToStudent(m, absenceCount, excusedCount) {
+function mapMemberToStudent(m, absenceCount, excusedCount, presentCount) {
   const name = m.name || nameFromEmail(m.email);
   return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—',
-    a: absenceCount || 0, aExcused: excusedCount || 0, memberId: m.id, userId: m.user_id };
+    a: absenceCount || 0, aExcused: excusedCount || 0, aPresent: presentCount || 0, memberId: m.id, userId: m.user_id };
 }
 
 // The number of absences that actually count against the free-absence/
@@ -4316,6 +4403,21 @@ function gradedAbsences(s) {
   return pol.excludeExcused ? Math.max(0, (s.a||0) - (s.aExcused||0)) : (s.a||0);
 }
 
+// Points-pool model (gradeModel==='points'): deduct mode starts everyone at
+// pointsTotal and takes pointsPerEvent for each graded absence (same
+// excused-absence rule as the pct model, via gradedAbsences()); earn mode
+// starts at 0 and credits pointsPerEvent for each rehearsal actually
+// attended (present or late), capped at pointsTotal — an excused absence
+// just isn't a rehearsal attended, so it costs nothing there without any
+// special-casing. s.aPresent is only populated in live mode
+// (loadRosterFromDB()); demo mode has no concept of a per-student present
+// count, so this only produces a meaningful number in live mode.
+function pointsBalance(s) {
+  return pointsMode === 'earn'
+    ? Math.min(pointsTotal, (s.aPresent||0) * pointsPerEvent)
+    : Math.max(0, pointsTotal - gradedAbsences(s) * pointsPerEvent);
+}
+
 function mapMemberToJoinRequest(m) {
   const name = m.name || nameFromEmail(m.email);
   return { name, initials: initialsFromName(name), email: m.email || '', role: m.part || '', status: m.status, memberId: m.id };
@@ -4327,12 +4429,14 @@ function mapMemberToJoinRequest(m) {
 // (ensemble_members.absences is never written to — deriving it here means
 // it can never drift out of sync with what actually happened at check-in).
 async function loadRosterFromDB(e) {
-  const [membersRes, absenceRes, excusedRes] = await Promise.all([
+  const [membersRes, absenceRes, excusedRes, presentRes] = await Promise.all([
     supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id),
     supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
     // Approved-excuse count per student — feeds gradedAbsences() below when
     // the policy excludes excused absences from the grade math.
     supabase.from('excuses').select('user_id').eq('ensemble_id', e.id).eq('status', 'approved'),
+    // Rehearsals actually attended — feeds pointsBalance() in "earn" mode.
+    supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).in('status', ['present', 'late']),
   ]);
   if (membersRes.error) { console.error(membersRes.error); showToast('Could not load roster: ' + membersRes.error.message); return; }
   const rows = membersRes.data || [];
@@ -4340,8 +4444,10 @@ async function loadRosterFromDB(e) {
   (absenceRes.data || []).forEach(a => { absenceCounts[a.user_id] = (absenceCounts[a.user_id]||0) + 1; });
   const excusedCounts = {};
   (excusedRes.data || []).forEach(x => { excusedCounts[x.user_id] = (excusedCounts[x.user_id]||0) + 1; });
+  const presentCounts = {};
+  (presentRes.data || []).forEach(p => { presentCounts[p.user_id] = (presentCounts[p.user_id]||0) + 1; });
   e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
-    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0));
+    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0, m.user_id ? presentCounts[m.user_id] : 0));
   e.joinRequests = rows.filter(m => m.role === 'student' && m.status !== 'active').map(mapMemberToJoinRequest);
 }
 
@@ -4692,6 +4798,9 @@ function loadEnsembleContext() {
   calFilter = e.calFilter || 'all';
   gradeModel = e.gradeModel || 'pct';
   letterRules = JSON.parse(JSON.stringify(e.letterRules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}]));
+  pointsTotal = e.pointsTotal ?? 1000;
+  pointsPerEvent = e.pointsPerEvent ?? 5;
+  pointsMode = e.pointsMode || 'deduct';
 }
 
 function saveEnsembleContext() {
@@ -4709,6 +4818,9 @@ function saveEnsembleContext() {
   e.calFilter = calFilter;
   e.gradeModel = gradeModel;
   e.letterRules = JSON.parse(JSON.stringify(letterRules));
+  e.pointsTotal = pointsTotal;
+  e.pointsPerEvent = pointsPerEvent;
+  e.pointsMode = pointsMode;
 }
 
 let landingRole = 'teacher';
@@ -5396,9 +5508,15 @@ function selectGradeModel(model) {
   gradeModel = model;
   document.getElementById('gm-pct').classList.toggle('on', model==='pct');
   document.getElementById('gm-letter').classList.toggle('on', model==='letter');
+  document.getElementById('gm-points').classList.toggle('on', model==='points');
   document.getElementById('grading-pct-section').style.display = model==='pct' ? 'block' : 'none';
   document.getElementById('grading-letter-section').style.display = model==='letter' ? 'block' : 'none';
+  document.getElementById('grading-points-section').style.display = model==='points' ? 'block' : 'none';
+  // Free-absence grace period doesn't apply to the points pool — the pool
+  // size itself is the cushion (see the points-section card comment).
+  document.getElementById('grading-limits-card').style.display = model==='points' ? 'none' : 'block';
   renderLetterRules();
+  updPoints();
   renderRoster();
 }
 
