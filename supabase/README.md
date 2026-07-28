@@ -58,6 +58,16 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    index on `rehearsal_notes.event_id` (missing from the original schema),
    needed for `savePreNotes()`/`savePostNotes()` to upsert one notes row
    per event instead of erroring or creating duplicates.
+6. `migrations/0006_excuse_attachments_storage.sql` — creates a private
+   `excuse-attachments` Storage bucket (photos/PDFs of doctor's notes etc.
+   were previously embedded as base64 in `excuses.attachment_url`, which
+   works but bloats the table) with policies so a student can upload/view
+   their own files and a teacher can view any file under an ensemble they
+   teach, keyed by the `<ensemble_id>/<user_id>/...` path.
+7. `migrations/0007_notification_log.sql` — only needed if you're setting
+   up the Vercel Cron job (root `README.md` §3). Dedupes the two
+   timer-based notification rules so they don't re-email the same student
+   on every cron tick.
 
 ## 3. Enable email auth
 

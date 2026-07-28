@@ -1848,6 +1848,7 @@ if (supabase) {
       dataMode = 'live';
       await loadEnsemblesFromDB();
       enterApp();
+      await handleCheckinDeepLink(); // no-op unless the URL has ?checkin=<eventId>&ensemble=<ensembleId> (see genQR())
     } else if (event === 'SIGNED_OUT') {
       resetToLogin();
     }
@@ -1967,7 +1968,7 @@ const tlData=[
   {l:'Act 1 Run-through',d:'May 5',s:'absent',ex:'pending'},
   {l:'Main Stage Rehearsal',d:'May 2',s:'present',ex:null},
 ];
-let curExcId=null,upImgSrc='';
+let curExcId=null,upImgSrc='',upFile=null;
 let pol={free:2,fail:4,ded:5,tardy:3};
 
 /* BADGES */
@@ -2183,21 +2184,33 @@ async function loadExcusesFromDB(e) {
   if (error) { console.error(error); showToast('Could not load excuses: ' + error.message); return; }
   const memberByUser = {};
   (e.students||[]).forEach(s => { if (s.userId) memberByUser[s.userId] = s; });
-  e.excuses = (data||[]).map(row => {
+  e.excuses = await Promise.all((data||[]).map(async row => {
     const ev = row.attendance && row.attendance.events;
     const member = memberByUser[row.user_id];
     const isMe = row.user_id === authSession.user.id;
+    // attachment_url holds a Storage path (see submitExc()), not a public
+    // URL — the bucket is private, so resolve a short-lived signed URL to
+    // actually display it.
+    let src = '';
+    if (row.attachment_url) {
+      const { data: signed } = await supabase.storage.from('excuse-attachments')
+        .createSignedUrl(row.attachment_url, 3600);
+      src = signed?.signedUrl || '';
+    }
     return {
       id: row.id,
       stu: member ? member.n : (isMe ? currentStudent.name : 'Student'),
       ini: member ? member.i : initialsFromName(isMe ? currentStudent.name : 'Student'),
       ev: ev ? ev.name : '', dt: ev ? dispDateFromISO(ev.event_date) : '',
       type: row.type || '', txt: row.text || '',
-      img: !!row.attachment_url, src: row.attachment_url || '',
+      // Only render <img> for actual image attachments — matches the
+      // original prototype's behavior, where a PDF's upImgSrc stayed ''
+      // and the review card just showed "No attachment" for it too.
+      img: !!row.attachment_url && /\.(jpe?g|png|gif|webp|heic)$/i.test(row.attachment_url), src,
       status: row.status || 'pending', note: row.teacher_note || '',
       userId: row.user_id,
     };
-  });
+  }));
 }
 
 // Finds the signed-in student's most recent absence with no excuse yet
@@ -2279,6 +2292,7 @@ async function decideExc(d){
 }
 function handleUp(inp){
   const file=inp.files[0];if(!file)return;
+  upFile=file; // live mode uploads this to Storage in submitExc(); upImgSrc below is local preview only
   const zone=document.getElementById('upzone'),icon=document.getElementById('up-icon'),lbl=document.getElementById('up-lbl');
   zone.classList.add('ok');icon.className='ti ti-circle-check';lbl.textContent=file.name;
   if(file.type.startsWith('image/')){const r=new FileReader();r.onload=e=>{upImgSrc=e.target.result;document.getElementById('up-img').src=upImgSrc;document.getElementById('uprev').style.display='block';document.getElementById('pdf-nm').style.display='none'};r.readAsDataURL(file);}
@@ -2291,18 +2305,24 @@ async function submitExc(){
   if (dataMode === 'live') {
     if (!pendingExcuseTarget) { showToast('No absence selected to excuse.'); return; }
     const e = activeEns();
-    // upImgSrc is a client-side data: URL (see handleUp()) — there's no
-    // Supabase Storage upload wired up, so this stores the image inline in
-    // the row rather than as a real file. Fine for small attachments;
-    // would bloat the table for anything large.
+
+    let attachmentPath = null;
+    if (upFile) {
+      const path = `${e.id}/${authSession.user.id}/${Date.now()}-${upFile.name}`;
+      const { error: upErr } = await supabase.storage.from('excuse-attachments').upload(path, upFile);
+      if (upErr) { showToast('Could not upload attachment: ' + upErr.message); return; }
+      attachmentPath = path;
+    }
+
     const { error } = await supabase.from('excuses').insert({
       attendance_id: pendingExcuseTarget.attendanceId, user_id: authSession.user.id, ensemble_id: e.id,
-      type, text: txt, attachment_url: upImgSrc || null, status: 'pending',
+      type, text: txt, attachment_url: attachmentPath, status: 'pending',
     });
     if (error) { showToast('Could not submit excuse: ' + error.message); return; }
     await loadExcusesFromDB(e);
     loadEnsembleContext();
     pendingExcuseTarget = null;
+    upFile = null; upImgSrc = '';
   } else {
     excuses.unshift({id:Date.now(),stu:'Jordan Martinez',ini:'JM',ev:'Act 1 Run-through',dt:'May 5',type,txt,img:!!upImgSrc,src:upImgSrc,status:'pending',note:''});
     tlData[3].ex='pending';
@@ -2769,9 +2789,22 @@ let qrSize = 220;
 function genQR() {
   const typeBtn = document.querySelector('#qr-type-btns .chip.on');
   const type = typeBtn ? typeBtn.dataset.v : 'checkin';
-  const url = type === 'homescreen'
-    ? 'https://calltime.app/join?setup=1'
-    : 'https://calltime.app/checkin?event=tonight';
+  let url;
+  if (dataMode === 'live') {
+    // Real deep link back to this app — see handleCheckinDeepLink().
+    const base = window.location.origin + window.location.pathname;
+    const ev = pickTodayEvent();
+    url = type === 'homescreen' ? base : (ev ? `${base}?checkin=${ev.id}&ensemble=${activeEns().id}` : base);
+    const nameEl = document.getElementById('qr-event-name');
+    const subEl = document.getElementById('qr-sub');
+    if (nameEl) nameEl.textContent = (ev ? ev.n : 'No event scheduled today') + ' · Tonight';
+    if (subEl) subEl.textContent = ev ? ev.n : 'No event today';
+  } else {
+    // demo mode: unchanged — the original mockup URL, no real route behind it
+    url = type === 'homescreen'
+      ? 'https://calltime.app/join?setup=1'
+      : 'https://calltime.app/checkin?event=tonight';
+  }
   loadQRLib(() => {
     qrInstance = new QRious({
       element: document.getElementById('qr-canvas'),
@@ -3139,17 +3172,19 @@ async function saveEvent() {
   const typeVal = typeEl.options[typeEl.selectedIndex].value || typeEl.value;
   const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
 
+  let liveToastMsg = 'Event saved: ' + name;
   if (dataMode === 'live') {
-    // Recurrence is decorative in this UI (see the demo-mode label-only
-    // branch below) — live mode always creates the single event as entered.
     const geo = pendingEventGeo.ev;
-    const ok = await upsertEventToDB({
-      name, type: typeVal, eventDate: date, callTime: call,
-      startTime: start, endTime: end, venue, dress, program: programPills, notes,
+    const startDateObj = new Date(date + 'T00:00');
+    const occurrences = computeRecurrenceDates(startDateObj, recurSel);
+    const ok = await insertRecurringEvents({
+      name, type: typeVal, callTime: call, startTime: start, endTime: end, venue, dress,
+      program: programPills, notes,
       geoLat: geo ? geo.lat : null, geoLng: geo ? geo.lng : null,
       geoRadius: parseInt(document.getElementById('ev-geo-radius').value) || 50,
-    });
+    }, occurrences);
     if (!ok) return;
+    if (occurrences.length > 1) liveToastMsg = occurrences.length + ' events created (recurring).';
     pendingEventGeo.ev = null;
     document.getElementById('ev-geo-status').textContent = 'No location set — check-in won\'t be location-restricted';
     document.getElementById('ev-geo-radius').value = 50;
@@ -3190,7 +3225,7 @@ async function saveEvent() {
   renderCal();
   if (dataMode === 'live') await renderTodayCard();
   closeM('event');
-  showToast('Event saved: ' + name);
+  showToast(dataMode === 'live' ? liveToastMsg : 'Event saved: ' + name);
 
   // Reset form
   document.querySelector('#m-event input[type=text]').value = '';
@@ -4226,9 +4261,9 @@ function mapDbEnsemble(dbEns, myMembership) {
   };
 }
 
-function mapMemberToStudent(m) {
+function mapMemberToStudent(m, absenceCount) {
   const name = m.name || nameFromEmail(m.email);
-  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—', a: m.absences || 0, memberId: m.id, userId: m.user_id };
+  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—', a: absenceCount || 0, memberId: m.id, userId: m.user_id };
 }
 
 function mapMemberToJoinRequest(m) {
@@ -4238,11 +4273,20 @@ function mapMemberToJoinRequest(m) {
 
 // Full roster for the ensemble the teacher is currently in — every member
 // row, not just the signed-in user's own (RLS allows this for teachers only).
+// Absence counts come from real attendance rows, not a stored counter
+// (ensemble_members.absences is never written to — deriving it here means
+// it can never drift out of sync with what actually happened at check-in).
 async function loadRosterFromDB(e) {
-  const { data, error } = await supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id);
-  if (error) { console.error(error); showToast('Could not load roster: ' + error.message); return; }
-  const rows = data || [];
-  e.students = rows.filter(m => m.role === 'student' && m.status === 'active').map(mapMemberToStudent);
+  const [membersRes, absenceRes] = await Promise.all([
+    supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id),
+    supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
+  ]);
+  if (membersRes.error) { console.error(membersRes.error); showToast('Could not load roster: ' + membersRes.error.message); return; }
+  const rows = membersRes.data || [];
+  const absenceCounts = {};
+  (absenceRes.data || []).forEach(a => { absenceCounts[a.user_id] = (absenceCounts[a.user_id]||0) + 1; });
+  e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
+    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0));
   e.joinRequests = rows.filter(m => m.role === 'student' && m.status !== 'active').map(mapMemberToJoinRequest);
 }
 
@@ -4372,6 +4416,102 @@ async function upsertEventToDB(fields, existingId) {
     ? await supabase.from('events').update(payload).eq('id', existingId)
     : await supabase.from('events').insert(payload);
   if (error) { showToast('Could not save event: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+// Expands the New Event modal's recurrence controls into real dates.
+// Presets with no end-date UI at all (weekly/monwed/mwf) are capped at 12
+// weeks — roughly a semester of 1-3x/week rehearsals — and "custom" with
+// "never" as its end condition is capped at 52 occurrences. Both are just
+// guardrails against an unbounded insert, not a real "ends never" feature.
+function computeRecurrenceDates(startDate, recurSel) {
+  if (recurSel === 'none' || !recurSel) return [startDate];
+
+  if (recurSel === 'weekly') {
+    const dates = [];
+    for (let i = 0; i < 12; i++) dates.push(new Date(startDate.getTime() + i*7*86400000));
+    return dates;
+  }
+
+  if (recurSel === 'monwed' || recurSel === 'mwf') {
+    const wantDays = recurSel === 'monwed' ? [1,3] : [1,3,5];
+    const dates = [];
+    let d = new Date(startDate);
+    const endBound = new Date(startDate.getTime() + 12*7*86400000);
+    while (d <= endBound) {
+      if (wantDays.includes(d.getDay())) dates.push(new Date(d));
+      d = new Date(d.getTime() + 86400000);
+    }
+    return dates;
+  }
+
+  if (recurSel === 'custom') {
+    const wantDays = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b => b.dataset.d);
+    const dayIndex = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+    const wantIdx = wantDays.map(d => dayIndex[d]).filter(n => n !== undefined);
+    const every = parseInt(document.getElementById('recur-every').value) || 1;
+    const unit = document.getElementById('recur-unit').value;
+    const endMode = document.querySelector('input[name="recur-end"]:checked')?.value || 'never';
+    const endDateVal = document.getElementById('recur-end-date').value;
+    const endDate = endDateVal ? new Date(endDateVal + 'T00:00') : null;
+    const endCount = parseInt(document.getElementById('recur-end-count').value) || 10;
+    const maxOccurrences = endMode === 'count' ? endCount : 52;
+
+    const dates = [];
+    if (wantIdx.length === 0) {
+      // No specific weekday picked — repeat the start date's own weekday
+      // every `every` unit(s).
+      let d = new Date(startDate);
+      while (dates.length < maxOccurrences) {
+        if (endMode === 'date' && endDate && d > endDate) break;
+        dates.push(new Date(d));
+        if (unit === 'day') d = new Date(d.getTime() + every*86400000);
+        else if (unit === 'month') { const nd = new Date(d); nd.setMonth(nd.getMonth()+every); d = nd; }
+        else d = new Date(d.getTime() + every*7*86400000);
+      }
+    } else {
+      // Specific weekdays picked — walk day by day (the `every`/`unit`
+      // interval fields only apply to the no-specific-days case above,
+      // matching how the modal groups them visually).
+      let d = new Date(startDate);
+      let scanned = 0;
+      while (dates.length < maxOccurrences && scanned < 366) {
+        if (endMode === 'date' && endDate && d > endDate) break;
+        if (wantIdx.includes(d.getDay())) dates.push(new Date(d));
+        d = new Date(d.getTime() + 86400000);
+        scanned++;
+      }
+    }
+    return dates;
+  }
+
+  return [startDate];
+}
+
+// Bulk insert for computeRecurrenceDates()'s output — one events row per
+// date, all sharing the same name/time/venue/etc.
+async function insertRecurringEvents(fields, dates) {
+  const e = activeEns();
+  const rows = dates.map(d => ({
+    ensemble_id: e.id,
+    name: fields.name,
+    type: fields.type || 'Rehearsal',
+    event_date: isoFromDateObj(d),
+    call_time: fields.callTime || null,
+    start_time: fields.startTime || null,
+    end_time: fields.endTime || null,
+    venue: fields.venue || null,
+    dress: fields.dress || null,
+    program: fields.program && fields.program.length ? fields.program : null,
+    notes: fields.notes || null,
+    geo_lat: fields.geoLat ?? null,
+    geo_lng: fields.geoLng ?? null,
+    geo_radius: fields.geoRadius || 50,
+  }));
+  const { error } = await supabase.from('events').insert(rows);
+  if (error) { showToast('Could not save events: ' + error.message); return false; }
   await loadEventsFromDB(e);
   loadEnsembleContext();
   return true;
@@ -4681,6 +4821,27 @@ async function enterEnsembleAsStudent(idx) {
   renderAll();
   renderStuSchedule();
   if (dataMode === 'live') await renderTodayCard();
+}
+
+// Handles a QR check-in scan: genQR() encodes a real URL back to this app
+// with ?checkin=<eventId>&ensemble=<ensembleId> (live mode only — the demo
+// QR still points at a fake calltime.app domain, matching the original
+// mockup). Routes the signed-in student straight to that ensemble's home
+// tab where the check-in ring is — it does NOT auto-tap the ring; the
+// human still makes that gesture themselves.
+async function handleCheckinDeepLink() {
+  if (dataMode !== 'live') return false;
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get('checkin');
+  const ensembleId = params.get('ensemble');
+  if (!eventId || !ensembleId) return false;
+  history.replaceState(null, '', window.location.pathname); // consume the params so a refresh doesn't re-trigger this
+  const idx = ensembles.findIndex(en => en.id === ensembleId);
+  if (idx === -1) { showToast('Could not find that ensemble.'); return false; }
+  await enterEnsembleAsStudent(idx);
+  const ev = evList.find(e => e.id === eventId);
+  showToast(ev ? 'Ready to check in for ' + ev.n : 'Ready to check in');
+  return true;
 }
 
 async function enterEnsemble(idx) {
