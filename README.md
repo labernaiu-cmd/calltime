@@ -71,14 +71,18 @@ it bypasses every RLS policy in `supabase/migrations/`).
 2. Set a `CRON_SECRET` env var to any random string; Vercel automatically
    sends it as `Authorization: Bearer $CRON_SECRET` when it invokes a
    scheduled function, and `tick.js` checks for exactly that.
-3. `vercel.json` already declares the schedule (`*/15 * * * *` — every 15
-   minutes). **Check your current Vercel plan's cron limits before
-   deploying** — free/Hobby-tier restrictions on cron frequency have
-   changed over time and this repo can't know which apply to your account.
-   If 15-minute intervals aren't available on your plan, either widen the
-   schedule or point an external scheduler (a free uptime-monitor/cron-ping
-   service works fine) at `https://yourapp.vercel.app/api/cron/tick` with
-   the `CRON_SECRET` header instead.
+3. `vercel.json` declares the schedule as `0 6 * * *` — once a day. Vercel's
+   **Hobby plan only allows daily cron jobs**, not shorter intervals, so
+   this is the fastest schedule that deploys without a paid plan. That
+   means auto-checkout and the absence-warning/pre-event-reminder emails
+   only run once a day rather than near-real-time — acceptable for trying
+   things out, but worth knowing about. If you're on (or upgrade to) a
+   **Pro plan**, you can tighten this to something like `*/15 * * * *`
+   (every 15 minutes) for much faster turnaround. Alternatively, skip
+   Vercel Cron's limit entirely by pointing an external scheduler (a free
+   uptime-monitor/cron-ping service works fine) at
+   `https://yourapp.vercel.app/api/cron/tick` with the `CRON_SECRET`
+   header, at whatever frequency you like.
 
 Skipping this step entirely is fine — everything else in the app works
 without it. You'll just have attendance rows that never auto-checkout, and
