@@ -427,7 +427,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <!-- ATTENDANCE -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="slbl" style="margin:0">Attendance</div>
-      <div class="gpill"><div class="gdot"></div>Geo-fence active · 50m</div>
+      <div class="gpill" id="today-geo-pill"><div class="gdot"></div>Geo-fence active · 50m</div>
     </div>
     <div class="card" style="margin-bottom:14px" id="today-list"></div>
 
@@ -708,7 +708,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
 
       <div style="display:flex;gap:8px">
-        <button class="btn btnp" onclick="saveAll('cfm-grading')"><i class="ti ti-device-floppy"></i>Save</button>
+        <button class="btn btnp" onclick="saveGradingPolicy('cfm-grading')"><i class="ti ti-device-floppy"></i>Save</button>
         <button class="btn" onclick="resetGrading()"><i class="ti ti-refresh"></i>Reset defaults</button>
       </div>
       <div class="cfm" id="cfm-grading"><i class="ti ti-circle-check" style="vertical-align:-2px"></i> Saved — roster updated.</div>
@@ -891,7 +891,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stu-today-dress">Rehearsal blacks</div>
           </div>
         </div>
-        <div class="gpill" style="margin-bottom:14px"><div class="gdot"></div>You're within the rehearsal zone</div>
+        <div class="gpill" style="margin-bottom:14px" id="stu-geo-pill"><div class="gdot"></div>You're within the rehearsal zone</div>
 
         <!-- CHECK-IN RING -->
         <div style="text-align:center;padding:1rem 0">
@@ -949,7 +949,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <div style="font-size:14px;font-weight:600;color:var(--rd)">Missed rehearsal — May 5</div>
         </div>
         <div style="font-size:13px;color:var(--t2);margin-bottom:12px">You have 48 hours to submit an excuse or this will count as unexcused.</div>
-        <button class="btn btnp" style="width:100%;justify-content:center" onclick="openM('exc-sub')"><i class="ti ti-file-text"></i>Submit excuse</button>
+        <button class="btn btnp" style="width:100%;justify-content:center" onclick="openExcuseSubmit()"><i class="ti ti-file-text"></i>Submit excuse</button>
       </div>
 
     </div>
@@ -993,7 +993,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stupane" id="stu-excuses">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div class="slbl" style="margin:0">My excuses</div>
-        <button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openM('exc-sub')"><i class="ti ti-plus"></i>Submit excuse</button>
+        <button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openExcuseSubmit()"><i class="ti ti-plus"></i>Submit excuse</button>
       </div>
       <div id="stu-excuses-list"></div>
     </div>
@@ -1050,8 +1050,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="field">
       <label>Geo-fence radius</label>
       <div style="display:flex;align-items:center;gap:10px">
-        <input type="range" min="10" max="200" value="50" step="5" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('gr-v').textContent=this.value+'m'"/>
+        <input type="range" min="10" max="200" value="50" step="5" id="ev-geo-radius" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('gr-v').textContent=this.value+'m'"/>
         <span id="gr-v" style="font-size:13px;color:var(--t2);min-width:42px">50m</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="captureEventGeo('ev')"><i class="ti ti-map-pin"></i>Set to my current location</button>
+        <span id="ev-geo-status" style="font-size:12px;color:var(--t3)">No location set — check-in won't be location-restricted</span>
       </div>
     </div>
 
@@ -1147,6 +1151,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="frow">
       <div class="field"><label>Venue</label><input type="text" id="ce-venue"/></div>
       <div class="field"><label>Dress / attire</label><input type="text" id="ce-dress"/></div>
+    </div>
+    <div class="field">
+      <label>Geo-fence radius</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="range" min="10" max="200" value="50" step="5" id="ce-geo-radius" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('ce-gr-v').textContent=this.value+'m'"/>
+        <span id="ce-gr-v" style="font-size:13px;color:var(--t2);min-width:42px">50m</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="captureEventGeo('ce')"><i class="ti ti-map-pin"></i>Update to my current location</button>
+        <span id="ce-geo-status" style="font-size:12px;color:var(--t3)">No location set — check-in won't be location-restricted</span>
+      </div>
     </div>
     <div class="field">
       <label>Program (one piece per line — Title, Composer)</label>
@@ -1311,7 +1326,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="mtitle"><i class="ti ti-file-text"></i>Submit an excuse</div>
     <div style="background:var(--s2);border-radius:var(--rs);padding:10px 12px;margin-bottom:14px">
       <div style="font-size:12px;color:var(--t2)">Absence for</div>
-      <div style="font-size:14px;font-weight:600">Act 1 Run-through · May 5</div>
+      <div style="font-size:14px;font-weight:600" id="exc-sub-event-hdr">Act 1 Run-through · May 5</div>
     </div>
     <div class="field"><label>Type of absence</label>
       <select id="exc-type">
@@ -1839,6 +1854,28 @@ if (supabase) {
   });
 }
 
+// Calls the /api/send-email Vercel function (see api/send-email.js), passing
+// the signed-in user's Supabase access token so the endpoint can verify the
+// caller before relaying through Resend. Returns true/false, never throws —
+// callers loop over recipients and count failures rather than aborting on
+// the first one.
+async function sendEmail(to, subject, body, from) {
+  if (!authSession) { showToast('Not signed in.'); return false; }
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authSession.access_token },
+      body: JSON.stringify({ to, subject, body, from }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { console.error('send-email failed', json); return false; }
+    return true;
+  } catch (err) {
+    console.error('send-email failed', err);
+    return false;
+  }
+}
+
 async function sendMagicLink() {
   const emailInput = document.getElementById('login-email');
   const errEl = document.getElementById('login-error');
@@ -2090,6 +2127,11 @@ async function toggleCI(){
     if (!ev) { showToast('No event scheduled today.'); return; }
     const checkedIn = document.getElementById('ciring').classList.contains('in');
     if (!checkedIn) {
+      const fence = await checkGeoFence(ev);
+      if (!fence.ok) {
+        const proceed = confirm('You appear to be about ' + fence.distance + 'm from the rehearsal location. Check in anyway?');
+        if (!proceed) return;
+      }
       const { error } = await supabase.from('attendance').upsert({
         event_id: ev.id, user_id: authSession.user.id, ensemble_id: activeEns().id,
         status: 'present', checkin_at: new Date().toISOString(), checkout_at: null,
@@ -2130,6 +2172,61 @@ function closeLB(){document.getElementById('lbox').classList.remove('open')}
 
 /* EXCUSES */
 function filterExc(f){renderExcuses();}
+// Loads every excuse for the ensemble (teacher) or the signed-in student's
+// own (RLS enforces the latter automatically). excuses has no direct
+// event_id — only attendance_id — so the event name/date come through a
+// nested select via attendance -> events.
+async function loadExcusesFromDB(e) {
+  const { data, error } = await supabase.from('excuses')
+    .select('*, attendance(event_id, events(name, event_date))')
+    .eq('ensemble_id', e.id).order('submitted_at', { ascending: false });
+  if (error) { console.error(error); showToast('Could not load excuses: ' + error.message); return; }
+  const memberByUser = {};
+  (e.students||[]).forEach(s => { if (s.userId) memberByUser[s.userId] = s; });
+  e.excuses = (data||[]).map(row => {
+    const ev = row.attendance && row.attendance.events;
+    const member = memberByUser[row.user_id];
+    const isMe = row.user_id === authSession.user.id;
+    return {
+      id: row.id,
+      stu: member ? member.n : (isMe ? currentStudent.name : 'Student'),
+      ini: member ? member.i : initialsFromName(isMe ? currentStudent.name : 'Student'),
+      ev: ev ? ev.name : '', dt: ev ? dispDateFromISO(ev.event_date) : '',
+      type: row.type || '', txt: row.text || '',
+      img: !!row.attachment_url, src: row.attachment_url || '',
+      status: row.status || 'pending', note: row.teacher_note || '',
+      userId: row.user_id,
+    };
+  });
+}
+
+// Finds the signed-in student's most recent absence with no excuse yet
+// filed against it, via a nested select through attendance -> events
+// (excuses has no direct event_id). Powers openExcuseSubmit() below since
+// the submit-excuse modal has no picker UI for "which absence is this for".
+async function findMyMostRecentAbsence() {
+  const { data, error } = await supabase.from('attendance')
+    .select('id, event_id, events(name, event_date)')
+    .eq('user_id', authSession.user.id).eq('status', 'absent')
+    .order('event_date', { foreignTable: 'events', ascending: false })
+    .limit(1);
+  if (error || !data || !data.length || !data[0].events) return null;
+  return { attendanceId: data[0].id, eventName: data[0].events.name, eventDate: data[0].events.event_date };
+}
+
+let pendingExcuseTarget = null; // {attendanceId, eventName, eventDate} — set by openExcuseSubmit(), live mode only
+
+async function openExcuseSubmit() {
+  if (dataMode === 'live') {
+    const target = await findMyMostRecentAbsence();
+    if (!target) { showToast('No unresolved absences to submit an excuse for.'); return; }
+    pendingExcuseTarget = target;
+    const hdr = document.getElementById('exc-sub-event-hdr');
+    if (hdr) hdr.textContent = target.eventName + ' · ' + dispDateFromISO(target.eventDate);
+  }
+  openM('exc-sub');
+}
+
 function openRev(id){
   const ex=excuses.find(e=>e.id===id);if(!ex)return;curExcId=id;
   document.getElementById('rev-hdr').innerHTML=`<div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:28px;height:28px;font-size:10px">${ex.ini}</div><div><div style="font-size:13px;font-weight:600">${ex.stu}</div><div style="font-size:12px;color:var(--t2)">${ex.ev} · ${ex.dt} · <strong>${ex.type}</strong></div></div></div>`;
@@ -2138,21 +2235,46 @@ function openRev(id){
   if(ex.img){att.style.display='block';document.getElementById('rev-img').src=ex.src}else{att.style.display='none'}
   document.getElementById('rev-note').value=ex.note||'';openM('exc-rev');
 }
-function decideExc(d){
+async function decideExc(d){
   const ex=excuses.find(e=>e.id===curExcId);if(!ex)return;
-  ex.status=d;ex.note=document.getElementById('rev-note').value;
+  const note = document.getElementById('rev-note').value;
+
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('excuses')
+      .update({ status: d, teacher_note: note, reviewed_at: new Date().toISOString() })
+      .eq('id', curExcId);
+    if (error) { showToast('Could not save decision: ' + error.message); return; }
+    const e = activeEns();
+    await loadExcusesFromDB(e);
+    loadEnsembleContext();
+
+    // Fire-and-forget the approved/denied notice, using the excuse's own
+    // event (not necessarily today's) for the {{event_name}}/{{event_date}}
+    // tokens — a minimal shim since ex only carries display strings, not a
+    // full mapped event.
+    const member = students.find(s => s.userId === ex.userId);
+    const tpl = tpls[d === 'approved' ? 'exc_app' : 'exc_den'];
+    if (member && member.e && tpl) {
+      const evShim = { n: ex.ev, d: ex.dt, dateObj: null };
+      sendEmail(member.e, renderTemplateTokens(tpl.s, member, evShim), renderTemplateTokens(tpl.b, member, evShim));
+    }
+  } else {
+    ex.status=d;ex.note=note;
+  }
+
   closeM('exc-rev');renderExcuses();renderLog();
   // Also refresh student excuses tab if it's open
   const stuExcPane = document.getElementById('stu-excuses');
   if(stuExcPane && stuExcPane.classList.contains('show')) renderStuExcuses();
-  // Update student badge
-  const myExcuses = excuses.filter(e=>e.stu==='Jordan Martinez');
-  const unexcused = myExcuses.filter(e=>e.status==='denied').length;
-  const pending = myExcuses.filter(e=>e.status==='pending').length;
-  const badge = document.getElementById('stu-badge');
-  if(badge) {
-    const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
-    badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+
+  if (dataMode !== 'live') {
+    // Update student badge (demo mode only — live mode has no equivalent
+    // absence-count recompute here; see decideExc's known gap in the PR notes)
+    const badge = document.getElementById('stu-badge');
+    if(badge) {
+      const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
+      badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+    }
   }
 }
 function handleUp(inp){
@@ -2162,11 +2284,31 @@ function handleUp(inp){
   if(file.type.startsWith('image/')){const r=new FileReader();r.onload=e=>{upImgSrc=e.target.result;document.getElementById('up-img').src=upImgSrc;document.getElementById('uprev').style.display='block';document.getElementById('pdf-nm').style.display='none'};r.readAsDataURL(file);}
   else{upImgSrc='';document.getElementById('uprev').style.display='none';document.getElementById('pdf-nm').style.display='block';document.getElementById('pdf-nm-t').textContent=file.name;}
 }
-function submitExc(){
+async function submitExc(){
   const type=document.getElementById('exc-type').value,txt=document.getElementById('exc-txt').value.trim();
   if(!type||!txt){alert('Please select a reason and write an explanation.');return}
-  excuses.unshift({id:Date.now(),stu:'Jordan Martinez',ini:'JM',ev:'Act 1 Run-through',dt:'May 5',type,txt,img:!!upImgSrc,src:upImgSrc,status:'pending',note:''});
-  tlData[3].ex='pending';closeM('exc-sub');document.getElementById('exc-submit-card').style.display='none';renderAll();
+
+  if (dataMode === 'live') {
+    if (!pendingExcuseTarget) { showToast('No absence selected to excuse.'); return; }
+    const e = activeEns();
+    // upImgSrc is a client-side data: URL (see handleUp()) — there's no
+    // Supabase Storage upload wired up, so this stores the image inline in
+    // the row rather than as a real file. Fine for small attachments;
+    // would bloat the table for anything large.
+    const { error } = await supabase.from('excuses').insert({
+      attendance_id: pendingExcuseTarget.attendanceId, user_id: authSession.user.id, ensemble_id: e.id,
+      type, text: txt, attachment_url: upImgSrc || null, status: 'pending',
+    });
+    if (error) { showToast('Could not submit excuse: ' + error.message); return; }
+    await loadExcusesFromDB(e);
+    loadEnsembleContext();
+    pendingExcuseTarget = null;
+  } else {
+    excuses.unshift({id:Date.now(),stu:'Jordan Martinez',ini:'JM',ev:'Act 1 Run-through',dt:'May 5',type,txt,img:!!upImgSrc,src:upImgSrc,status:'pending',note:''});
+    tlData[3].ex='pending';
+  }
+
+  closeM('exc-sub');document.getElementById('exc-submit-card').style.display='none';renderAll();
   const stuExcPane2 = document.getElementById('stu-excuses');
   if(stuExcPane2 && stuExcPane2.classList.contains('show')) renderStuExcuses();
 }
@@ -2194,6 +2336,67 @@ function resetGrading(){
   selChip(document.querySelector('#late-chips [data-v="10"]'),'late-chips');
   updPol();
 }
+
+function mapDbGradingPolicy(row) {
+  return {
+    free: row.free_absences ?? 2, fail: row.fail_threshold ?? 4,
+    ded: row.deduction_pct ?? 5, tardy: row.tardies_per_absence ?? 3,
+    model: row.model || 'pct', letterStyle: row.letter_style || 'half',
+    letterRules: row.letter_rules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}],
+    lateWindow: row.late_window_min ?? 10, excWindow: row.excuse_window_hours ?? 48,
+  };
+}
+
+async function loadGradingPolicyFromDB(e) {
+  const { data, error } = await supabase.from('grading_policies').select('*').eq('ensemble_id', e.id).maybeSingle();
+  if (error) { console.error(error); return; }
+  if (!data) return; // never saved yet — ensembleDefaults()' pol/gradeModel/letterRules stand
+  const mapped = mapDbGradingPolicy(data);
+  e.pol = { free: mapped.free, fail: mapped.fail, ded: mapped.ded, tardy: mapped.tardy };
+  e.gradeModel = mapped.model;
+  e.letterRules = mapped.letterRules;
+  // Read by syncGradingSettingsUI() below — not part of loadEnsembleContext's
+  // swap since there's no dedicated global for them, only DOM chip state.
+  e._lateWindow = mapped.lateWindow;
+  e._excWindow = mapped.excWindow;
+  e._letterStyle = mapped.letterStyle;
+}
+
+// The Settings > Grading sliders/chips are plain HTML with hardcoded
+// defaults — nothing reads `pol`/`gradeModel` into them on load. Harmless
+// in demo mode (nothing ever changes them from those defaults), but once
+// a real policy can be loaded from the DB the tab needs to actually show it.
+function syncGradingSettingsUI(e) {
+  document.getElementById('r-free').value = pol.free;
+  document.getElementById('r-fail').value = pol.fail;
+  document.getElementById('r-ded').value = pol.ded;
+  document.getElementById('r-tardy').value = pol.tardy;
+  updPol();
+  selectGradeModel(gradeModel);
+  const lateBtn = document.querySelector(`#late-chips [data-v="${e._lateWindow||10}"]`);
+  if (lateBtn) selChip(lateBtn, 'late-chips');
+  const excBtn = document.querySelector(`#exc-win [data-v="${e._excWindow||48}"]`);
+  if (excBtn) selChip(excBtn, 'exc-win');
+  const letterBtn = document.querySelector(`#letter-style-btns [data-v="${e._letterStyle||'half'}"]`);
+  if (letterBtn) selChip(letterBtn, 'letter-style-btns');
+}
+
+async function saveGradingPolicy(id) {
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const lateWindow  = parseInt(document.querySelector('#late-chips .chip.on')?.dataset.v || 10);
+    const excWindow   = parseInt(document.querySelector('#exc-win .chip.on')?.dataset.v || 48);
+    const letterStyle = document.querySelector('#letter-style-btns .chip.on')?.dataset.v || 'half';
+    const { error } = await supabase.from('grading_policies').upsert({
+      ensemble_id: e.id, model: gradeModel,
+      free_absences: pol.free, fail_threshold: pol.fail, deduction_pct: pol.ded, tardies_per_absence: pol.tardy,
+      late_window_min: lateWindow, letter_style: letterStyle, letter_rules: letterRules, excuse_window_hours: excWindow,
+    }, { onConflict: 'ensemble_id' });
+    if (error) { showToast('Could not save grading policy: ' + error.message); return; }
+  }
+  flash(id);
+}
+
 function saveAll(id){flash(id)}
 
 /* NOTIFICATION RULES */
@@ -2247,10 +2450,60 @@ function renderRules(){
       </div>
     </div>`).join('');
 }
-function togRule(id){const r=rules.find(r=>r.id===id);if(r){r.on=!r.on;renderRules()}}
-function updRule(id,k,v){const r=rules.find(r=>r.id===id);if(r)r[k]=v}
-function delRule(id){rules=rules.filter(r=>r.id!==id);renderRules()}
-function addRule(){rules.push({id:Date.now(),on:true,lbl:'New rule',trig:'end_of_event',off:0,unit:'min',tpl:'absence'});renderRules()}
+function mapDbRule(row) {
+  return { id: row.id, on: row.enabled, lbl: row.label || 'New rule', trig: row.trigger || 'end_of_event',
+    off: row.offset_value || 0, unit: row.offset_unit || 'min', tpl: row.template_key || 'absence' };
+}
+
+async function loadNotificationRulesFromDB(e) {
+  const { data, error } = await supabase.from('notification_rules').select('*').eq('ensemble_id', e.id);
+  if (error) { console.error(error); showToast('Could not load notification rules: ' + error.message); return; }
+  e.rules = (data || []).map(mapDbRule);
+}
+
+async function togRule(id){
+  const r=rules.find(r=>r.id===id); if(!r) return;
+  r.on=!r.on;
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('notification_rules').update({ enabled: r.on }).eq('id', id);
+    if (error) { showToast('Could not update rule: ' + error.message); r.on=!r.on; renderRules(); return; }
+  }
+  renderRules();
+}
+async function updRule(id,k,v){
+  const r=rules.find(r=>r.id===id); if(!r) return;
+  r[k]=v;
+  if (dataMode === 'live') {
+    const colMap = { trig: 'trigger', off: 'offset_value', unit: 'offset_unit', tpl: 'template_key', lbl: 'label' };
+    const col = colMap[k];
+    if (!col) return;
+    const { error } = await supabase.from('notification_rules')
+      .update({ [col]: k === 'off' ? parseInt(v) : v }).eq('id', id);
+    if (error) showToast('Could not update rule: ' + error.message);
+  }
+}
+async function delRule(id){
+  if (dataMode === 'live') {
+    const { error } = await supabase.from('notification_rules').delete().eq('id', id);
+    if (error) { showToast('Could not delete rule: ' + error.message); return; }
+  }
+  rules=rules.filter(r=>r.id!==id);
+  renderRules();
+}
+async function addRule(){
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { data, error } = await supabase.from('notification_rules').insert({
+      ensemble_id: e.id, label: 'New rule', enabled: true, trigger: 'end_of_event',
+      offset_value: 0, offset_unit: 'min', template_key: 'absence',
+    }).select().single();
+    if (error) { showToast('Could not add rule: ' + error.message); return; }
+    rules.push(mapDbRule(data));
+  } else {
+    rules.push({id:Date.now(),on:true,lbl:'New rule',trig:'end_of_event',off:0,unit:'min',tpl:'absence'});
+  }
+  renderRules();
+}
 
 /* EMAIL TEMPLATES */
 const tokens=[
@@ -2314,13 +2567,22 @@ function switchTpl(key,btn){document.querySelectorAll('#tpl-tabs .chip').forEach
 function loadTpl(key){document.getElementById('tpl-subj').value=tpls[key].s;document.getElementById('tpl-body').value=tpls[key].b;updPrev()}
 function updPrev(){let p='Subject: '+document.getElementById('tpl-subj').value+'\n\n'+document.getElementById('tpl-body').value;tokens.forEach(t=>{p=p.split(t.k).join(sample[t.k]||t.k)});document.getElementById('tpl-prev').textContent=p}
 function insertTok(k){const ta=document.getElementById('tpl-body');const s=ta.selectionStart,e=ta.selectionEnd;ta.value=ta.value.slice(0,s)+k+ta.value.slice(e);ta.selectionStart=ta.selectionEnd=s+k.length;ta.focus();tpls[curTpl].b=ta.value;updPrev()}
-function saveTpl(){tpls[curTpl].s=document.getElementById('tpl-subj').value;tpls[curTpl].b=document.getElementById('tpl-body').value;flash('cfm-tpl')}
-function resetTpl(){
+async function saveTpl(){
+  tpls[curTpl].s=document.getElementById('tpl-subj').value;
+  tpls[curTpl].b=document.getElementById('tpl-body').value;
+  if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, tpls[curTpl].s, tpls[curTpl].b); if (!ok) return; }
+  flash('cfm-tpl');
+}
+async function resetTpl(){
   if(defTpls[curTpl]) {
-    tpls[curTpl]=JSON.parse(JSON.stringify(defTpls[curTpl]));loadTpl(curTpl);
+    tpls[curTpl]=JSON.parse(JSON.stringify(defTpls[curTpl]));
+    if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, tpls[curTpl].s, tpls[curTpl].b); if (!ok) return; }
+    loadTpl(curTpl);
   } else {
     if(confirm('Clear this custom template?')) {
-      tpls[curTpl]={s:'',b:''};loadTpl(curTpl);
+      tpls[curTpl]={s:'',b:''};
+      if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, '', ''); if (!ok) return; }
+      loadTpl(curTpl);
     }
   }
 }
@@ -2662,7 +2924,22 @@ function updateReminderTo(val) {
   document.getElementById('rem-send-ct').textContent = ct;
 }
 
-function sendReminder() {
+async function sendReminder() {
+  if (dataMode === 'live') {
+    const filter = document.querySelector('#m-reminder .chip.on')?.dataset.v || 'all';
+    const recipients = (filter === 'absent' ? students.filter(s=>s.s==='absent') : students)
+      .map(s=>s.e).filter(Boolean);
+    if (!recipients.length) { showToast('No student emails on file to send to.'); return; }
+    const subject = document.getElementById('rem-subject')?.value || 'Rehearsal reminder';
+    const body = document.getElementById('rem-body')?.value || '';
+    const results = await Promise.all(recipients.map(to => sendEmail(to, subject, body)));
+    const failCount = results.filter(ok=>!ok).length;
+    closeM('reminder');
+    showToast(failCount
+      ? `Sent, but ${failCount} email(s) failed.`
+      : 'Reminder sent to ' + recipients.length + ' student' + (recipients.length!==1?'s':'') + '!');
+    return;
+  }
   closeM('reminder');
   showToast('Reminder sent to ' + document.getElementById('rem-send-ct').textContent + ' students!');
 }
@@ -2865,11 +3142,18 @@ async function saveEvent() {
   if (dataMode === 'live') {
     // Recurrence is decorative in this UI (see the demo-mode label-only
     // branch below) — live mode always creates the single event as entered.
+    const geo = pendingEventGeo.ev;
     const ok = await upsertEventToDB({
       name, type: typeVal, eventDate: date, callTime: call,
       startTime: start, endTime: end, venue, dress, program: programPills, notes,
+      geoLat: geo ? geo.lat : null, geoLng: geo ? geo.lng : null,
+      geoRadius: parseInt(document.getElementById('ev-geo-radius').value) || 50,
     });
     if (!ok) return;
+    pendingEventGeo.ev = null;
+    document.getElementById('ev-geo-status').textContent = 'No location set — check-in won\'t be location-restricted';
+    document.getElementById('ev-geo-radius').value = 50;
+    document.getElementById('gr-v').textContent = '50m';
   } else {
     // Format display date
     const d = new Date(date + 'T00:00');
@@ -3025,6 +3309,12 @@ function openCalEdit(idx) {
   document.getElementById('ce-dress').value = e.dress || '';
   document.getElementById('ce-program').value = e.program ? e.program.join('\n') : '';
   document.getElementById('ce-notes').value  = e.notes || '';
+  pendingEventGeo.ce = null;
+  document.getElementById('ce-geo-radius').value = e.geoRadius || 50;
+  document.getElementById('ce-gr-v').textContent = (e.geoRadius || 50) + 'm';
+  document.getElementById('ce-geo-status').textContent = e.geoLat != null
+    ? 'Location set — check-in is restricted to the radius above.'
+    : 'No location set — check-in won\'t be location-restricted.';
   openM('cal-edit');
 }
 
@@ -3052,14 +3342,18 @@ async function saveCalEdit() {
     // ce-start/ce-end/ce-call are free-text 12h strings (e.g. "7:00 pm"),
     // unlike ev-*/te-* which are real <input type="time">; normalize before
     // storing so fmt12() reads them back correctly next load.
+    const geo = pendingEventGeo.ce;
     const ok = await upsertEventToDB({
       name, type, eventDate: date || e.eventDate,
       callTime: normalizeTimeTo24h(call) || e.callTimeRaw,
       startTime: normalizeTimeTo24h(start) || e.startTime,
       endTime: normalizeTimeTo24h(end) || e.endTime,
       venue, dress, program: programPills, notes,
+      geoLat: geo ? geo.lat : e.geoLat, geoLng: geo ? geo.lng : e.geoLng,
+      geoRadius: parseInt(document.getElementById('ce-geo-radius').value) || e.geoRadius || 50,
     }, e.id);
     if (!ok) return;
+    pendingEventGeo.ce = null;
   } else {
     // Format display date
     let dispDate = e.d;
@@ -3169,9 +3463,25 @@ function renderResources() {
     </div>`).join('');
 }
 
-function saveDriveLink() {
+function mapDbResource(r) {
+  return { id: r.id, title: r.title, type: r.type || 'document', url: r.url || '', desc: r.description || '' };
+}
+
+async function loadResourcesFromDB(e) {
+  const { data, error } = await supabase.from('resources').select('*').eq('ensemble_id', e.id).order('created_at');
+  if (error) { console.error(error); showToast('Could not load resources: ' + error.message); return; }
+  e.resources = (data || []).map(mapDbResource);
+}
+
+async function saveDriveLink() {
   const url = document.getElementById('drive-url-input').value.trim();
   if(!url) { alert('Please enter a URL.'); return; }
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('ensembles').update({ drive_url: url }).eq('id', e.id);
+    if (error) { showToast('Could not save Drive link: ' + error.message); return; }
+    e.driveURL = url;
+  }
   driveURL = url;
   const display = document.getElementById('drive-url-display');
   const btn = document.getElementById('drive-link-btn');
@@ -3181,14 +3491,25 @@ function saveDriveLink() {
   showToast('Drive folder linked!');
 }
 
-function saveResource() {
+async function saveResource() {
   const title = document.getElementById('res-title').value.trim();
   const url   = document.getElementById('res-url').value.trim();
   const type  = document.getElementById('res-type').value;
   const desc  = document.getElementById('res-desc').value.trim();
   if(!title) { alert('Please enter a title.'); return; }
   if(!url)   { alert('Please enter a URL.'); return; }
-  resources.push({id: Date.now(), title, type, url, desc});
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('resources').insert({
+      ensemble_id: e.id, title, type, url, description: desc || null,
+    });
+    if (error) { showToast('Could not add resource: ' + error.message); return; }
+    await loadResourcesFromDB(e);
+    loadEnsembleContext();
+  } else {
+    resources.push({id: Date.now(), title, type, url, desc});
+  }
   renderResources();
   closeM('add-resource');
   document.getElementById('res-title').value = '';
@@ -3197,9 +3518,17 @@ function saveResource() {
   showToast('Resource added!');
 }
 
-function deleteResource(id) {
+async function deleteResource(id) {
   if(!confirm('Remove this resource?')) return;
-  resources = resources.filter(r=>r.id!==id);
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('resources').delete().eq('id', id);
+    if (error) { showToast('Could not remove resource: ' + error.message); return; }
+    await loadResourcesFromDB(e);
+    loadEnsembleContext();
+  } else {
+    resources = resources.filter(r=>r.id!==id);
+  }
   renderResources();
 }
 
@@ -3287,6 +3616,7 @@ function prefillTodayEdit() {
 async function renderTodayCard() {
   if (dataMode !== 'live') return;
   const ev = pickTodayEvent();
+  await loadRehearsalNotesForEvent(ev);
 
   const teacherName = document.getElementById('today-event-name');
   if (teacherName) {
@@ -3324,6 +3654,19 @@ async function renderTodayCard() {
         stuProgSection.style.display = 'none';
       }
     }
+  }
+
+  const teacherPill = document.getElementById('today-geo-pill');
+  if (teacherPill) {
+    teacherPill.innerHTML = ev && ev.geoLat != null
+      ? `<div class="gdot"></div>Geo-fence active · ${ev.geoRadius}m`
+      : `<div class="gdot"></div>No geo-fence set for this event`;
+  }
+  const stuPill = document.getElementById('stu-geo-pill');
+  if (stuPill) {
+    stuPill.innerHTML = ev && ev.geoLat != null
+      ? `<div class="gdot"></div>Geo-fence active · ${ev.geoRadius}m — checked when you check in`
+      : `<div class="gdot"></div>No location restriction for tonight`;
   }
 
   renderTodayMetrics();
@@ -3408,6 +3751,44 @@ async function cycleAttendance(userId) {
   s.t = next === 'absent' ? '—' : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   renderAll();
   renderTodayMetrics();
+  if (next === 'absent') maybeSendAbsenceNotice(s, ev); // fire-and-forget — never blocks the UI on email delivery
+}
+
+// Substitutes the {{...}} tokens from the template editor (see `tokens`)
+// with real values for `student`/`ev`, using the active ensemble's own
+// name/teacher/grading policy rather than the editor's static preview data.
+function renderTemplateTokens(text, student, ev) {
+  const e = activeEns();
+  const over = Math.max(0, (student.a||0) - pol.free);
+  const values = {
+    '{{student_name}}': student.n || '',
+    '{{event_name}}': ev ? ev.n : '',
+    '{{event_date}}': ev ? ev.d : '',
+    '{{absence_count}}': String(student.a||0),
+    '{{absences_remaining}}': String(Math.max(0, pol.fail - (student.a||0))),
+    '{{grade_impact}}': over > 0 ? ('−' + (over*pol.ded) + '%') : '0%',
+    '{{excuse_deadline}}': ev && ev.dateObj ? new Date(ev.dateObj.getTime() + (e?._excWindow||48)*3600000).toLocaleDateString() : '',
+    '{{production_name}}': e ? e.name : '',
+    '{{teacher_name}}': e ? e.teacher : '',
+    '{{teacher_email}}': e ? e.email : '',
+  };
+  let out = text || '';
+  Object.entries(values).forEach(([k,v]) => { out = out.split(k).join(v); });
+  return out;
+}
+
+// Fires the "Absence notice" rule the moment a student is marked absent —
+// the only trigger from the Settings > Notifications rules this build
+// wires automatically. 'after_absence' (crossing the free-absence count)
+// and 'before_event' (a scheduled reminder) both need something to run on
+// a timer independent of any user action — a Vercel cron job or Supabase
+// Edge Function — which this project doesn't have; see supabase/README.md.
+async function maybeSendAbsenceNotice(student, ev) {
+  if (!student.e) return;
+  const rule = rules.find(r => r.on && r.trig === 'end_of_event' && r.tpl && tpls[r.tpl]);
+  if (!rule) return;
+  const tpl = tpls[rule.tpl];
+  await sendEmail(student.e, renderTemplateTokens(tpl.s, student, ev), renderTemplateTokens(tpl.b, student, ev));
 }
 
 
@@ -3651,7 +4032,10 @@ function renderStuSchedule() {
 function renderStuExcuses() {
   const el = document.getElementById('stu-excuses-list');
   if(!el) return;
-  const mine = excuses.filter(e => e.stu === 'Jordan Martinez');
+  // Live mode: RLS already restricts `excuses` to the signed-in student's
+  // own rows, so no name filter is needed (and ex.stu is now their real
+  // name, not always 'Jordan Martinez').
+  const mine = dataMode === 'live' ? excuses : excuses.filter(e => e.stu === 'Jordan Martinez');
   if(!mine.length) {
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No excuse requests yet.</div>';
     return;
@@ -3950,6 +4334,9 @@ function mapDbEvent(dbEv) {
     startTime: dbEv.start_time || '',
     endTime: dbEv.end_time || '',
     callTimeRaw: dbEv.call_time || '',
+    geoLat: dbEv.geo_lat ?? null,
+    geoLng: dbEv.geo_lng ?? null,
+    geoRadius: dbEv.geo_radius || 50,
   };
 }
 
@@ -3977,6 +4364,9 @@ async function upsertEventToDB(fields, existingId) {
     dress: fields.dress || null,
     program: fields.program && fields.program.length ? fields.program : null,
     notes: fields.notes || null,
+    geo_lat: fields.geoLat ?? null,
+    geo_lng: fields.geoLng ?? null,
+    geo_radius: fields.geoRadius || 50,
   };
   const { error } = existingId
     ? await supabase.from('events').update(payload).eq('id', existingId)
@@ -4007,6 +4397,58 @@ function pickTodayEvent() {
     .filter(e => e.dateObj && e.dateObj.getTime() >= today.getTime())
     .sort((a,b) => a.dateObj - b.dateObj);
   return upcoming[0] || null;
+}
+
+/* ═══════════════════════════════════════════
+   GEOLOCATION (Phase 4)
+═══════════════════════════════════════════ */
+
+// {lat,lng} most recently captured in the New/Edit event modal, keyed by
+// modal field prefix ('ev' or 'ce'). Cleared after each save.
+let pendingEventGeo = { ev: null, ce: null };
+
+function captureEventGeo(prefix) {
+  const statusEl = document.getElementById(prefix + '-geo-status');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = 'Geolocation is not available in this browser.';
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      pendingEventGeo[prefix] = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (statusEl) statusEl.textContent = 'Location set — check-in will be restricted to the radius above.';
+    },
+    () => { if (statusEl) statusEl.textContent = 'Could not get your location — check-in will not be location-restricted.'; },
+    { timeout: 8000 }
+  );
+}
+
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Resolves {ok, distance}. Fails open (ok:true, no distance) whenever the
+// event has no fence configured, geolocation isn't available, or the
+// browser denies/times out the request — a GPS hiccup should never be
+// what stops a student from checking in.
+function checkGeoFence(ev) {
+  return new Promise(resolve => {
+    if (!ev || ev.geoLat == null || ev.geoLng == null) { resolve({ ok: true }); return; }
+    if (!navigator.geolocation) { resolve({ ok: true }); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const dist = getDistanceMeters(pos.coords.latitude, pos.coords.longitude, ev.geoLat, ev.geoLng);
+        resolve({ ok: dist <= (ev.geoRadius || 50), distance: Math.round(dist) });
+      },
+      () => resolve({ ok: true }),
+      { timeout: 8000 }
+    );
+  });
 }
 
 // Live-mode "impressive but optional" real-time (spec §2.3): the teacher's
@@ -4046,7 +4488,10 @@ function loadEnsembleContext() {
   pol = {...(e.pol || {free:2,fail:4,ded:5,tardy:3})};
   rules = JSON.parse(JSON.stringify(e.rules || []));
   tpls = JSON.parse(JSON.stringify(e.tpls || defTpls));
+  customTpls = JSON.parse(JSON.stringify(e.customTpls || {}));
   calFilter = e.calFilter || 'all';
+  gradeModel = e.gradeModel || 'pct';
+  letterRules = JSON.parse(JSON.stringify(e.letterRules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}]));
 }
 
 function saveEnsembleContext() {
@@ -4060,7 +4505,10 @@ function saveEnsembleContext() {
   e.pol       = {...pol};
   e.rules     = JSON.parse(JSON.stringify(rules));
   e.tpls      = JSON.parse(JSON.stringify(tpls));
+  e.customTpls = JSON.parse(JSON.stringify(customTpls));
   e.calFilter = calFilter;
+  e.gradeModel = gradeModel;
+  e.letterRules = JSON.parse(JSON.stringify(letterRules));
 }
 
 let landingRole = 'teacher';
@@ -4198,9 +4646,9 @@ async function enterEnsembleAsStudent(idx) {
   const e = ensembles[idx];
 
   // RLS blocks a student from seeing classmates' roster rows, so there's no
-  // loadRosterFromDB() call here — only events, which every active member
-  // may read.
-  if (dataMode === 'live') await loadEventsFromDB(e);
+  // loadRosterFromDB() call here — events, resources, and this student's
+  // own excuses (RLS-restricted) are all every active member may read.
+  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e)]);
 
   loadEnsembleContext();
 
@@ -4240,17 +4688,28 @@ async function enterEnsemble(idx) {
   activeEnsIdx = idx;
   const e = ensembles[idx];
 
-  // Only a teacher of this ensemble can see the full roster (RLS); fetch
-  // it and events before rendering so students/joinRequests/evList are
-  // populated by the time loadEnsembleContext() copies them onto the
-  // global arrays.
-  if (dataMode === 'live') await Promise.all([loadRosterFromDB(e), loadEventsFromDB(e)]);
+  // Only a teacher of this ensemble can see the full roster and email
+  // templates (RLS); fetch everything before rendering so students/
+  // joinRequests/evList/resources/tpls are populated by the time
+  // loadEnsembleContext() copies them onto the global arrays.
+  if (dataMode === 'live') {
+    await Promise.all([
+      loadRosterFromDB(e), loadEventsFromDB(e), loadResourcesFromDB(e), loadTemplatesFromDB(e),
+      loadGradingPolicyFromDB(e), loadNotificationRulesFromDB(e),
+    ]);
+    // Depends on e.students (roster) being populated already, so it can't
+    // run inside the Promise.all above.
+    await loadExcusesFromDB(e);
+  }
 
   loadEnsembleContext();
 
   // Merge in today's real attendance now that both the roster and the
   // event list are loaded (pickTodayEvent() reads the global evList).
-  if (dataMode === 'live') await loadAttendanceForEvent(pickTodayEvent());
+  if (dataMode === 'live') {
+    await loadAttendanceForEvent(pickTodayEvent());
+    syncGradingSettingsUI(e);
+  }
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -4476,13 +4935,41 @@ switchTab = function(id, btn) {
 
 
 /* NOTES TAB */
-function savePreNotes() {
+// Loads today's saved pre/post notes into the textareas — called from
+// renderTodayCard() once pickTodayEvent() is known, live mode only.
+async function loadRehearsalNotesForEvent(ev) {
+  const preEl = document.getElementById('pre-notes');
+  const postEl = document.getElementById('post-notes');
+  if (!ev) { if (preEl) preEl.value = ''; if (postEl) postEl.value = ''; return; }
+  const { data, error } = await supabase.from('rehearsal_notes').select('*').eq('event_id', ev.id).maybeSingle();
+  if (error) { console.error(error); return; }
+  if (preEl) preEl.value = data?.pre_notes || '';
+  if (postEl) postEl.value = data?.post_notes || '';
+}
+
+async function savePreNotes() {
   const lbl = document.getElementById('pre-notes-saved');
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const text = document.getElementById('pre-notes')?.value || '';
+    const { error } = await supabase.from('rehearsal_notes')
+      .upsert({ event_id: ev.id, ensemble_id: activeEns().id, pre_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
+    if (error) { showToast('Could not save notes: ' + error.message); return; }
+  }
   if(lbl) { lbl.textContent = 'Saved ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); setTimeout(()=>lbl.textContent='',4000); }
 }
 
-function savePostNotes() {
+async function savePostNotes() {
   const lbl = document.getElementById('post-notes-saved');
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const text = document.getElementById('post-notes')?.value || '';
+    const { error } = await supabase.from('rehearsal_notes')
+      .upsert({ event_id: ev.id, ensemble_id: activeEns().id, post_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
+    if (error) { showToast('Could not save notes: ' + error.message); return; }
+  }
   if(lbl) { lbl.textContent = 'Draft saved ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); setTimeout(()=>lbl.textContent='',4000); }
 }
 
@@ -4516,9 +5003,33 @@ function buildPostEmail() {
   if(prevEl) prevEl.textContent = body;
 }
 
-function sendPostEmail() {
+async function sendPostEmail() {
+  if (dataMode === 'live') {
+    const subject = document.getElementById('post-email-subject')?.value || 'Post-rehearsal notes';
+    const body = document.getElementById('post-email-body')?.value || '';
+    const recipients = students.map(s => s.e).filter(Boolean);
+    if (!recipients.length) { showToast('No student emails on file to send to.'); return; }
+
+    const results = await Promise.all(recipients.map(to => sendEmail(to, subject, body)));
+    const failCount = results.filter(ok => !ok).length;
+
+    const ev = pickTodayEvent();
+    if (ev) {
+      const rawNotes = document.getElementById('post-notes')?.value || '';
+      const { error } = await supabase.from('rehearsal_notes').upsert({
+        event_id: ev.id, ensemble_id: activeEns().id, post_notes: rawNotes, post_sent_at: new Date().toISOString(),
+      }, { onConflict: 'event_id' });
+      if (error) console.error(error);
+    }
+
+    closeM('post-email');
+    document.getElementById('post-notes').value = '';
+    showToast(failCount ? `Sent, but ${failCount} email(s) failed.` : 'Post-rehearsal email sent to ' + recipients.length + ' student' + (recipients.length!==1?'s':'') + '!');
+    return;
+  }
+
+  // demo mode: unchanged — fakes a "sent" history entry, no network call
   closeM('post-email');
-  // Save the post note to sent history
   const postText = document.getElementById('post-notes')?.value.trim();
   if(postText) {
     const evName = document.getElementById('today-event-name')?.textContent || 'Rehearsal';
@@ -4551,13 +5062,43 @@ function sendPostEmail() {
 /* CUSTOM TEMPLATES */
 let customTpls = {}; // key -> {s: subject, b: body}
 
-function createCustomTpl() {
+function mapDbTemplate(row) {
+  return { s: row.subject || '', b: row.body || '' };
+}
+
+// Loads every saved template for the ensemble (built-in keys the teacher
+// has edited, plus any custom_* ones) and layers them over the defaults so
+// a never-touched built-in still renders correctly.
+async function loadTemplatesFromDB(e) {
+  const { data, error } = await supabase.from('email_templates').select('*').eq('ensemble_id', e.id);
+  if (error) { console.error(error); showToast('Could not load templates: ' + error.message); return; }
+  const loaded = {};
+  (data || []).forEach(row => { loaded[row.key] = mapDbTemplate(row); });
+  e.tpls = { ...JSON.parse(JSON.stringify(defTpls)), ...loaded };
+  e.customTpls = {};
+  Object.keys(loaded).forEach(k => { if (!defTpls[k]) e.customTpls[k] = loaded[k]; });
+}
+
+async function upsertTemplateToDB(key, subject, body) {
+  const e = activeEns();
+  const { error } = await supabase.from('email_templates')
+    .upsert({ ensemble_id: e.id, key, subject, body }, { onConflict: 'ensemble_id,key' });
+  if (error) { showToast('Could not save template: ' + error.message); return false; }
+  return true;
+}
+
+async function createCustomTpl() {
   const name = document.getElementById('new-tpl-name').value.trim();
   if(!name) { alert('Please enter a template name.'); return; }
   // Generate a safe key from the name
   const key = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_') + '_' + Date.now();
-  customTpls[key] = { s: name + ' — {{production_name}}', b: 'Hi {{student_name}},\n\n\n\n— {{teacher_name}}' };
-  tpls[key] = { ...customTpls[key] };
+  const tpl = { s: name + ' — {{production_name}}', b: 'Hi {{student_name}},\n\n\n\n— {{teacher_name}}' };
+  if (dataMode === 'live') {
+    const ok = await upsertTemplateToDB(key, tpl.s, tpl.b);
+    if (!ok) return;
+  }
+  customTpls[key] = tpl;
+  tpls[key] = { ...tpl };
   closeM('new-tpl');
   document.getElementById('new-tpl-name').value = '';
   renderCustomTplChips(key);
@@ -4578,8 +5119,13 @@ function renderCustomTplChips(activateKey) {
   }).join('');
 }
 
-function deleteCustomTpl(key) {
+async function deleteCustomTpl(key) {
   if(!confirm('Delete this template?')) return;
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('email_templates').delete().eq('ensemble_id', e.id).eq('key', key);
+    if (error) { showToast('Could not delete template: ' + error.message); return; }
+  }
   delete tpls[key];
   delete customTpls[key];
   // If currently viewing this template, switch to absence

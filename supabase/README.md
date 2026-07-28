@@ -1,4 +1,7 @@
-# Supabase setup (Phase 1 + Phase 2)
+# Supabase setup
+
+> This file covers the database only. For Resend (email) and Vercel
+> (hosting) setup, see the root [`README.md`](../README.md).
 
 ## 1. Create the project
 
@@ -51,6 +54,10 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    `supabase_realtime` publication so the teacher's Today view can
    subscribe to check-ins live (`supabase.channel(...).on('postgres_changes', ...)`)
    instead of polling or requiring a refresh.
+5. `migrations/0005_rehearsal_notes_unique_event.sql` — adds a unique
+   index on `rehearsal_notes.event_id` (missing from the original schema),
+   needed for `savePreNotes()`/`savePostNotes()` to upsert one notes row
+   per event instead of erroring or creating duplicates.
 
 ## 3. Enable email auth
 
