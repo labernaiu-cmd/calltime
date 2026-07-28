@@ -32,7 +32,15 @@ done, and everything except outbound email will work.
 2. Either verify your own sending domain, or use `onboarding@resend.dev`
    for testing (Resend restricts that address to sending to your own
    verified account email — fine for trying things out, not for real
-   students).
+   students). `api/send-email.js` and `api/cron/tick.js` both default to
+   `onboarding@resend.dev`; swap in a verified-domain address once one's
+   approved for real students. Sending grade-related notices from your
+   institution's domain may need its own approval before you can verify
+   it in Resend — that's outside this app's scope, but worth starting
+   early since DNS/approval can take a while. The absence-warning/failing
+   templates intentionally point students to "consult your syllabus"
+   rather than including a computed grade number, to keep what's actually
+   transmitted minimal.
 3. Copy your API key.
 
 The actual sending happens server-side in `api/send-email.js` — the

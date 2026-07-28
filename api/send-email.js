@@ -36,7 +36,11 @@ export default async function handler(req, res) {
   }
 
   const { data, error } = await resend.emails.send({
-    from: from || 'Call Time <calltime@yourdomain.com>',
+    // onboarding@resend.dev requires no domain verification but only
+    // delivers to the Resend account's own verified email — swap this for
+    // an address on a verified domain (see supabase/README.md) once one's
+    // approved for sending to real students.
+    from: from || 'Call Time <onboarding@resend.dev>',
     to,
     subject,
     text: body,

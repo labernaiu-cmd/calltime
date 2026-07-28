@@ -2647,11 +2647,11 @@ async function addRule(){
 const tokens=[
   {k:'{{student_name}}',l:'Student name'},{k:'{{event_name}}',l:'Event name'},
   {k:'{{event_date}}',l:'Event date'},{k:'{{absence_count}}',l:'Absence count'},
-  {k:'{{absences_remaining}}',l:'Absences remaining'},{k:'{{grade_impact}}',l:'Grade impact'},
+  {k:'{{absences_remaining}}',l:'Absences remaining'},
   {k:'{{excuse_deadline}}',l:'Excuse deadline'},{k:'{{production_name}}',l:'Production name'},
   {k:'{{teacher_name}}',l:'Teacher name'},{k:'{{teacher_email}}',l:'Teacher email'},
 ];
-const sample={'{{student_name}}':'Jordan Martinez','{{event_name}}':'Main Stage Rehearsal','{{event_date}}':'Monday, May 12','{{absence_count}}':'3','{{absences_remaining}}':'1','{{grade_impact}}':'−5%','{{excuse_deadline}}':'Wednesday, May 14 at 7:00 pm','{{production_name}}':'Into the Woods','{{teacher_name}}':'Ms. Rivera','{{teacher_email}}':'mrivera@school.edu'};
+const sample={'{{student_name}}':'Jordan Martinez','{{event_name}}':'Main Stage Rehearsal','{{event_date}}':'Monday, May 12','{{absence_count}}':'3','{{absences_remaining}}':'1','{{excuse_deadline}}':'Wednesday, May 14 at 7:00 pm','{{production_name}}':'Into the Woods','{{teacher_name}}':'Ms. Rivera','{{teacher_email}}':'mrivera@school.edu'};
 const defTpls={
   absence:{s:'Absence recorded — {{event_name}} on {{event_date}}',b:`Hi {{student_name}},
 
@@ -2667,7 +2667,8 @@ If you have a valid excuse, please submit it by {{excuse_deadline}}.
 You've now used all your free absences for {{production_name}}. Any further absences will impact your grade.
 
 Absences so far: {{absence_count}}
-Grade impact: {{grade_impact}}
+
+Consult your syllabus to see how this affects your grade.
 
 Please make every effort to attend remaining rehearsals.
 
@@ -2677,7 +2678,7 @@ Please make every effort to attend remaining rehearsals.
 
 You have {{absence_count}} absences in {{production_name}}, which puts you at risk of a failing grade.
 
-Current grade impact: {{grade_impact}}
+Consult your syllabus to see how this affects your grade.
 
 Please contact me as soon as possible to discuss a plan.
 
@@ -2693,7 +2694,8 @@ Your excuse for {{event_name}} on {{event_date}} has been approved. This absence
 After review, your excuse for {{event_name}} on {{event_date}} was not approved.
 
 Absence count: {{absence_count}}
-Grade impact: {{grade_impact}}
+
+Consult your syllabus to see how this affects your grade.
 
 Please reach out if you'd like to discuss this.
 
@@ -3927,14 +3929,12 @@ async function cycleAttendance(userId) {
 // name/teacher/grading policy rather than the editor's static preview data.
 function renderTemplateTokens(text, student, ev) {
   const e = activeEns();
-  const over = Math.max(0, (student.a||0) - pol.free);
   const values = {
     '{{student_name}}': student.n || '',
     '{{event_name}}': ev ? ev.n : '',
     '{{event_date}}': ev ? ev.d : '',
     '{{absence_count}}': String(student.a||0),
     '{{absences_remaining}}': String(Math.max(0, pol.fail - (student.a||0))),
-    '{{grade_impact}}': over > 0 ? ('−' + (over*pol.ded) + '%') : '0%',
     '{{excuse_deadline}}': ev && ev.dateObj ? new Date(ev.dateObj.getTime() + (e?._excWindow||48)*3600000).toLocaleDateString() : '',
     '{{production_name}}': e ? e.name : '',
     '{{teacher_name}}': e ? e.teacher : '',

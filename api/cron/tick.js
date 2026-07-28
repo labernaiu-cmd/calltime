@@ -51,7 +51,9 @@ function tzOffsetMinutes(date, tz) {
 
 async function sendMail(to, subject, body) {
   try {
-    await resend.emails.send({ from: 'Call Time <calltime@yourdomain.com>', to, subject, text: body });
+    // See api/send-email.js's matching comment — swap for a verified-domain
+    // address once one's approved for sending to real students.
+    await resend.emails.send({ from: 'Call Time <onboarding@resend.dev>', to, subject, text: body });
     return true;
   } catch (err) {
     console.error('resend send failed', err);
