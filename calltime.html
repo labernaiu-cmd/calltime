@@ -382,9 +382,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
     <!-- METRICS -->
     <div class="metrics" style="margin-bottom:14px">
-      <div class="metric"><div class="mlbl">Present</div><div class="mval">9</div><div class="msub">of 14 students</div></div>
-      <div class="metric"><div class="mlbl">Late</div><div class="mval" style="color:var(--am)">2</div><div class="msub">after 7:00 pm</div></div>
-      <div class="metric"><div class="mlbl">Absent</div><div class="mval" style="color:var(--rd)">3</div><div class="msub">emails sent 7:01 pm</div></div>
+      <div class="metric"><div class="mlbl">Present</div><div class="mval" id="today-present-ct">9</div><div class="msub" id="today-present-sub">of 14 students</div></div>
+      <div class="metric"><div class="mlbl">Late</div><div class="mval" style="color:var(--am)" id="today-late-ct">2</div><div class="msub" id="today-late-sub">after 7:00 pm</div></div>
+      <div class="metric"><div class="mlbl">Absent</div><div class="mval" style="color:var(--rd)" id="today-absent-ct">3</div><div class="msub" id="today-absent-sub">emails sent 7:01 pm</div></div>
       <div class="metric"><div class="mlbl">Auto-checkout</div><div class="mval" style="font-size:20px">9:30<span style="font-size:13px;font-weight:400"> pm</span></div><div class="msub">in 1h 52m</div></div>
     </div>
 
@@ -869,26 +869,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px">
           <div>
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--pu);margin-bottom:3px">Tonight</div>
-            <div style="font-size:17px;font-weight:700">Main Stage Rehearsal</div>
+            <div style="font-size:17px;font-weight:700" id="stu-today-name">Main Stage Rehearsal</div>
           </div>
           <span class="badge bg" style="margin-top:4px">Tonight</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Call time</div>
-            <div style="font-size:13px;font-weight:600">6:30 pm</div>
+            <div style="font-size:13px;font-weight:600" id="stu-today-call">6:30 pm</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Rehearsal</div>
-            <div style="font-size:13px;font-weight:600">7:00 – 9:30 pm</div>
+            <div style="font-size:13px;font-weight:600" id="stu-today-time">7:00 – 9:30 pm</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Venue</div>
-            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Yardley Hall</div>
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stu-today-venue">Yardley Hall</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Attire</div>
-            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rehearsal blacks</div>
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stu-today-dress">Rehearsal blacks</div>
           </div>
         </div>
         <div class="gpill" style="margin-bottom:14px"><div class="gdot"></div>You're within the rehearsal zone</div>
@@ -904,9 +904,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
 
       <!-- TONIGHT PROGRAM -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" style="margin-bottom:14px" id="stu-today-program-section">
         <div style="font-size:13px;font-weight:600;margin-bottom:10px">Tonight's program</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:6px" id="stu-today-program">
           <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid var(--bd)">
             <i class="ti ti-music" style="color:var(--pu);font-size:14px;flex-shrink:0"></i>
             <div><div style="font-size:13px;font-weight:500">Lux Aeterna</div><div style="font-size:11px;color:var(--t3)">Morten Lauridsen</div></div>
@@ -1951,10 +1951,17 @@ function flash(id){const el=document.getElementById(id);if(!el)return;el.style.d
 
 /* RENDER */
 function renderAll(){
-  document.getElementById('today-list').innerHTML=students.map(s=>`
-    <div class="srow"><div class="avatar">${s.i}</div>
+  document.getElementById('today-list').innerHTML=students.map(s=>{
+    // Live mode: click a row to cycle its attendance status (present -> late
+    // -> absent). Members who've never signed in have no user_id yet, so
+    // there's nothing to key an attendance row on — show them read-only.
+    const live = dataMode === 'live';
+    const rowAttrs = live && s.userId ? ` onclick="cycleAttendance('${s.userId}')" style="cursor:pointer"` : '';
+    const statusHtml = live && !s.userId ? '<span style="font-size:11px;color:var(--t3)">Not signed up</span>' : bdg(s.s);
+    return `<div class="srow"${rowAttrs}><div class="avatar">${s.i}</div>
     <div style="flex:1"><div class="sname">${s.n}</div><div class="smeta">${s.r}</div></div>
-    <div style="text-align:right">${bdg(s.s)}<div style="font-size:11px;color:var(--t3);margin-top:2px">${s.t}</div></div></div>`).join('');
+    <div style="text-align:right">${statusHtml}<div style="font-size:11px;color:var(--t3);margin-top:2px">${s.t}</div></div></div>`;
+  }).join('');
   renderCal();
   renderRoster();renderExcuses();renderLog();
   const stuTlEl = document.getElementById('stu-tl'); if(stuTlEl) stuTlEl.innerHTML=tlData.map(t=>`<div class="tli"><div class="tldot ${t.s==='absent'?'ab':t.s==='late'?'la':''}"></div><div class="tldate">${t.d}</div><div class="tllbl">${t.l} ${bdg(t.s)}${t.ex?'&nbsp;'+excBdg(t.ex):''}</div></div>`).join('');
@@ -2076,8 +2083,29 @@ function switchStab(id,btn){
 }
 
 /* CHECK-IN */
-let ciIn=false;
-function toggleCI(){
+let ciIn=false; // demo-mode-only local toggle state
+async function toggleCI(){
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const checkedIn = document.getElementById('ciring').classList.contains('in');
+    if (!checkedIn) {
+      const { error } = await supabase.from('attendance').upsert({
+        event_id: ev.id, user_id: authSession.user.id, ensemble_id: activeEns().id,
+        status: 'present', checkin_at: new Date().toISOString(), checkout_at: null,
+      }, { onConflict: 'event_id,user_id' });
+      if (error) { showToast('Could not check in: ' + error.message); return; }
+    } else {
+      const { error } = await supabase.from('attendance')
+        .update({ checkout_at: new Date().toISOString() })
+        .eq('event_id', ev.id).eq('user_id', authSession.user.id);
+      if (error) { showToast('Could not check out: ' + error.message); return; }
+    }
+    await syncCheckInRing(ev);
+    return;
+  }
+
+  // demo mode: unchanged, purely cosmetic — no data is written anywhere
   ciIn=!ciIn;
   const ring=document.getElementById('ciring'),icon=document.getElementById('ci-icon'),lbl=document.getElementById('ci-lbl'),tm=document.getElementById('ci-time'),badge=document.getElementById('stu-badge');
   if(ciIn){ring.classList.add('in');icon.className='ti ti-door-exit';lbl.textContent='Checked in — tap to check out';const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});tm.textContent='Checked in at '+t;badge.textContent='Checked in';badge.className='badge bg';}
@@ -2093,6 +2121,7 @@ function openM(id){
   if(id==='reminder')   { buildReminderEmail(); }
   if(id==='absreport')  { renderReportModal(); }
   if(id==='post-email') { buildPostEmail(); }
+  if(id==='today-edit' && dataMode==='live') { prefillTodayEdit(); }
 }
 function closeM(id){document.getElementById('m-'+id).classList.remove('open')}
 function closeMBG(id,e){if(e.target===document.getElementById('m-'+id))closeM(id)}
@@ -2814,7 +2843,7 @@ function exportPDF() {
 
 
 /* SAVE EVENT */
-function saveEvent() {
+async function saveEvent() {
   const name   = document.getElementById('ev-name').value.trim();
   const date   = document.getElementById('ev-date').value;
   const typeEl = document.getElementById('ev-type');
@@ -2830,46 +2859,52 @@ function saveEvent() {
   if(!name) { alert('Please enter an event name.'); return; }
   if(!date)  { alert('Please select a date.'); return; }
 
-  // Format display date
-  const d = new Date(date + 'T00:00');
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
-
-  // Format time range
-  function fmt(t) {
-    if(!t) return '';
-    const [h,m] = t.split(':').map(Number);
-    return (h%12||12) + (m?':'+String(m).padStart(2,'0'):'') + (h>=12?' pm':' am');
-  }
-  const timeStr = start && end ? fmt(start) + '–' + fmt(end) : start ? fmt(start) : '';
-
-  // Recurrence label
-  let recurLabel = '';
-  if(recurSel === 'weekly')  recurLabel = ' · Weekly';
-  else if(recurSel === 'monwed') recurLabel = ' · Mon & Wed';
-  else if(recurSel === 'mwf')    recurLabel = ' · Mon/Wed/Fri';
-  else if(recurSel === 'custom') {
-    const days = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b=>b.dataset.v);
-    const every = document.getElementById('recur-every').value;
-    const unit  = document.getElementById('recur-unit').value;
-    if(days.length) recurLabel = ' · Every ' + (every>1?every+' ':'') + unit + (every>1?'s':'') + ' (' + days.join('/') + ')';
-  }
-
-  // Dot color by type
-  const typeToDot = { 'Rehearsal':'ep', 'Tech week':'ea', 'Dress rehearsal':'ea', 'Performance':'et', 'Meeting':'ep' };
   const typeVal = typeEl.options[typeEl.selectedIndex].value || typeEl.value;
-  const dot = typeToDot[typeVal] || 'ep';
+  const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
 
-  evList.push({ n: name + recurLabel, d: dispDate, t: timeStr, type: typeVal, dot, venue });
+  if (dataMode === 'live') {
+    // Recurrence is decorative in this UI (see the demo-mode label-only
+    // branch below) — live mode always creates the single event as entered.
+    const ok = await upsertEventToDB({
+      name, type: typeVal, eventDate: date, callTime: call,
+      startTime: start, endTime: end, venue, dress, program: programPills, notes,
+    });
+    if (!ok) return;
+  } else {
+    // Format display date
+    const d = new Date(date + 'T00:00');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
 
-  // Sort by date
-  evList.sort((a,b) => {
-    const parse = s => { const p=s.split(' '); return new Date(p[2]+' '+p[1]+' 2026'); };
-    return parse(a.d) - parse(b.d);
-  });
+    // Format time range
+    function fmt(t) {
+      if(!t) return '';
+      const [h,m] = t.split(':').map(Number);
+      return (h%12||12) + (m?':'+String(m).padStart(2,'0'):'') + (h>=12?' pm':' am');
+    }
+    const timeStr = start && end ? fmt(start) + '–' + fmt(end) : start ? fmt(start) : '';
+
+    // Recurrence label
+    let recurLabel = '';
+    if(recurSel === 'weekly')  recurLabel = ' · Weekly';
+    else if(recurSel === 'monwed') recurLabel = ' · Mon & Wed';
+    else if(recurSel === 'mwf')    recurLabel = ' · Mon/Wed/Fri';
+    else if(recurSel === 'custom') {
+      const days = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b=>b.dataset.v);
+      const every = document.getElementById('recur-every').value;
+      const unit  = document.getElementById('recur-unit').value;
+      if(days.length) recurLabel = ' · Every ' + (every>1?every+' ':'') + unit + (every>1?'s':'') + ' (' + days.join('/') + ')';
+    }
+
+    const dot = typeDotMap[(typeVal||'').toLowerCase()] || 'ep';
+    evList.push({ n: name + recurLabel, d: dispDate, t: timeStr, type: typeVal, dot, venue,
+                  callTime: call ? fmt(call) : '', dress, program: programPills, notes, dateObj: d });
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+  }
 
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('event');
   showToast('Event saved: ' + name);
 
@@ -2903,11 +2938,12 @@ function renderCal() {
     return (a.n||'').localeCompare(b.n||'');
   });
 
-  // Group by month+year
+  // Group by month+year (from dateObj, not a hardcoded year — events can
+  // now span real years once wired to the DB, not just the 2026 demo term)
+  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const groups = {};
   sorted.forEach(e => {
-    const parts = (e.d||'').split(' ');
-    const month = parts.length >= 2 ? parts[1] + ' 2026' : 'Upcoming';
+    const month = e.dateObj ? monNames[e.dateObj.getMonth()] + ' ' + e.dateObj.getFullYear() : 'Upcoming';
     if(!groups[month]) groups[month] = [];
     groups[month].push(e);
   });
@@ -2992,7 +3028,7 @@ function openCalEdit(idx) {
   openM('cal-edit');
 }
 
-function saveCalEdit() {
+async function saveCalEdit() {
   const idx  = parseInt(document.getElementById('ce-idx').value);
   const e    = evList[idx];
   if(!e) return;
@@ -3010,37 +3046,61 @@ function saveCalEdit() {
 
   if(!name) { alert('Event name is required.'); return; }
 
-  // Format display date
-  let dispDate = e.d;
-  let dateObj  = e.dateObj;
-  if(date) {
-    const d = new Date(date + 'T00:00');
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
-    dateObj  = d;
-  }
-
-  const timeStr = end ? start + '–' + end : start;
-  const dot = typeDotMap[(type||'').toLowerCase()] || 'ep';
   const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
 
-  // Update in place
-  evList[idx] = { ...e, n:name, d:dispDate, t:timeStr, type, dot, venue, callTime:call,
-                  dress, program:programPills, notes, dateObj };
+  if (dataMode === 'live') {
+    // ce-start/ce-end/ce-call are free-text 12h strings (e.g. "7:00 pm"),
+    // unlike ev-*/te-* which are real <input type="time">; normalize before
+    // storing so fmt12() reads them back correctly next load.
+    const ok = await upsertEventToDB({
+      name, type, eventDate: date || e.eventDate,
+      callTime: normalizeTimeTo24h(call) || e.callTimeRaw,
+      startTime: normalizeTimeTo24h(start) || e.startTime,
+      endTime: normalizeTimeTo24h(end) || e.endTime,
+      venue, dress, program: programPills, notes,
+    }, e.id);
+    if (!ok) return;
+  } else {
+    // Format display date
+    let dispDate = e.d;
+    let dateObj  = e.dateObj;
+    if(date) {
+      const d = new Date(date + 'T00:00');
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
+      dateObj  = d;
+    }
 
-  // Re-sort
-  evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+    const timeStr = end ? start + '–' + end : start;
+    const dot = typeDotMap[(type||'').toLowerCase()] || 'ep';
+
+    // Update in place
+    evList[idx] = { ...e, n:name, d:dispDate, t:timeStr, type, dot, venue, callTime:call,
+                    dress, program:programPills, notes, dateObj };
+
+    // Re-sort
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+  }
 
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-edit');
   showToast('Event updated!');
 }
 
-function deleteCalEvent(idx) {
+async function deleteCalEvent(idx) {
   if(!confirm('Delete this event?')) return;
-  evList.splice(idx, 1);
+  const e = evList[idx];
+  if(!e) return;
+  if (dataMode === 'live') {
+    const ok = await deleteEventFromDB(e.id);
+    if (!ok) return;
+  } else {
+    evList.splice(idx, 1);
+  }
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-edit');
   showToast('Event deleted.');
 }
@@ -3146,8 +3206,9 @@ function deleteResource(id) {
 /* TODAY COMMAND CENTER */
 
 
-function saveTodayEdit() {
+async function saveTodayEdit() {
   const name   = document.getElementById('te-name').value.trim();
+  const type   = document.getElementById('te-type').value;
   const call   = document.getElementById('te-call').value;
   const start  = document.getElementById('te-start').value;
   const end    = document.getElementById('te-end').value;
@@ -3155,6 +3216,24 @@ function saveTodayEdit() {
   const dress  = document.getElementById('te-dress').value.trim();
   const prog   = document.getElementById('te-program').value.trim();
 
+  if (dataMode === 'live') {
+    const existing = pickTodayEvent();
+    const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
+    const ok = await upsertEventToDB({
+      name: name || (existing ? existing.n : 'Rehearsal'),
+      type: type || (existing ? existing.type : 'Rehearsal'),
+      eventDate: existing ? existing.eventDate : isoFromDateObj(new Date()),
+      callTime: call, startTime: start, endTime: end, venue, dress,
+      program: programPills, notes: existing ? existing.notes : '',
+    }, existing ? existing.id : undefined);
+    if (!ok) return;
+    await renderTodayCard();
+    closeM('today-edit');
+    showToast('Event updated!');
+    return;
+  }
+
+  // demo mode: unchanged — pokes the (otherwise static) card DOM directly
   if(name)  document.getElementById('today-event-name').textContent = name;
   if(start && end) document.getElementById('today-time').textContent = fmt12(start) + ' – ' + fmt12(end);
   if(venue) document.getElementById('today-venue').textContent = venue;
@@ -3186,6 +3265,149 @@ function saveTodayEdit() {
 
   closeM('today-edit');
   showToast('Event updated!');
+}
+
+function prefillTodayEdit() {
+  const ev = pickTodayEvent();
+  if (!ev) return;
+  document.getElementById('te-name').value = ev.n || '';
+  document.getElementById('te-type').value = ev.type || 'Rehearsal';
+  document.getElementById('te-call').value = ev.callTimeRaw || '';
+  document.getElementById('te-start').value = ev.startTime || '';
+  document.getElementById('te-end').value = ev.endTime || '';
+  document.getElementById('te-venue').value = ev.venue || '';
+  document.getElementById('te-dress').value = ev.dress || '';
+  document.getElementById('te-program').value = (ev.program||[]).join('\n');
+}
+
+// Live mode only — replaces the static "Today's event" HTML (teacher pane)
+// and "Tonight" card (student pane) with the real event pickTodayEvent()
+// resolves to. Demo mode's cards stay exactly as authored; this function
+// no-ops there (see dataMode guard).
+async function renderTodayCard() {
+  if (dataMode !== 'live') return;
+  const ev = pickTodayEvent();
+
+  const teacherName = document.getElementById('today-event-name');
+  if (teacherName) {
+    teacherName.textContent = ev ? ev.n : 'No event scheduled today';
+    document.getElementById('today-calltime').textContent = ev && ev.callTime ? ev.callTime : '—';
+    document.getElementById('today-time').textContent = ev && ev.t ? ev.t : '—';
+    document.getElementById('today-venue').textContent = ev && ev.venue ? ev.venue : '—';
+    document.getElementById('today-dress').textContent = ev && ev.dress ? ev.dress : '—';
+    const progSection = document.getElementById('today-program-section');
+    if (progSection) {
+      if (ev && ev.program && ev.program.length) {
+        progSection.style.display = '';
+        document.getElementById('today-program').innerHTML = ev.program.map(p =>
+          `<span style="font-size:12px;background:var(--pbg);color:var(--ptx);padding:3px 10px;border-radius:20px">${p}</span>`).join('');
+      } else {
+        progSection.style.display = 'none';
+      }
+    }
+  }
+
+  const stuName = document.getElementById('stu-today-name');
+  if (stuName) {
+    stuName.textContent = ev ? ev.n : 'No event scheduled';
+    document.getElementById('stu-today-call').textContent = ev && ev.callTime ? ev.callTime : '—';
+    document.getElementById('stu-today-time').textContent = ev && ev.t ? ev.t : '—';
+    document.getElementById('stu-today-venue').textContent = ev && ev.venue ? ev.venue : '—';
+    document.getElementById('stu-today-dress').textContent = ev && ev.dress ? ev.dress : '—';
+    const stuProgSection = document.getElementById('stu-today-program-section');
+    if (stuProgSection) {
+      if (ev && ev.program && ev.program.length) {
+        stuProgSection.style.display = '';
+        document.getElementById('stu-today-program').innerHTML = ev.program.map(p =>
+          `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid var(--bd)"><i class="ti ti-music" style="color:var(--pu);font-size:14px;flex-shrink:0"></i><div style="font-size:13px;font-weight:500">${p}</div></div>`).join('');
+      } else {
+        stuProgSection.style.display = 'none';
+      }
+    }
+  }
+
+  renderTodayMetrics();
+  await syncCheckInRing(ev);
+}
+
+function renderTodayMetrics() {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const total = students.length;
+  const present = students.filter(s=>s.s==='present').length;
+  const late    = students.filter(s=>s.s==='late').length;
+  const absent  = students.filter(s=>s.s==='absent').length;
+  set('today-present-ct', present);
+  set('today-present-sub', 'of ' + total + ' students');
+  set('today-late-ct', late);
+  set('today-late-sub', late === 1 ? '1 checked in late' : late + ' checked in late');
+  set('today-absent-ct', absent);
+  set('today-absent-sub', absent ? 'not checked in' : 'none');
+}
+
+// Syncs the student check-in ring to the real attendance row for `ev`
+// (disabling it entirely when there's no event today) — the source of
+// truth after every check-in/out and after each real-time update.
+async function syncCheckInRing(ev) {
+  const ring = document.getElementById('ciring');
+  if (!ring) return;
+  if (!ev) {
+    ring.style.opacity = '.4';
+    ring.style.pointerEvents = 'none';
+    const lbl = document.getElementById('ci-lbl'); if (lbl) lbl.textContent = 'No event today';
+    const tm  = document.getElementById('ci-time'); if (tm) tm.textContent = '';
+    ring.classList.remove('in');
+    return;
+  }
+  ring.style.opacity = '';
+  ring.style.pointerEvents = '';
+  const { data } = await supabase.from('attendance').select('*')
+    .eq('event_id', ev.id).eq('user_id', authSession.user.id).maybeSingle();
+  const icon = document.getElementById('ci-icon'), lbl = document.getElementById('ci-lbl'), tm = document.getElementById('ci-time');
+  if (data && data.checkin_at && !data.checkout_at) {
+    ring.classList.add('in'); icon.className = 'ti ti-door-exit';
+    lbl.textContent = 'Checked in — tap to check out';
+    tm.textContent = 'Checked in at ' + new Date(data.checkin_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  } else {
+    ring.classList.remove('in'); icon.className = 'ti ti-door-enter';
+    lbl.textContent = 'Tap to check in';
+    tm.textContent = data && data.checkout_at ? 'Checked out — see you next rehearsal!' : '';
+  }
+}
+
+// Merges real attendance rows for `ev` onto the roster (students[].s/.t),
+// so renderAll()/renderRoster()'s existing bdg(s.s) rendering just works.
+// No event today, or a member with no attendance row, both read as absent.
+async function loadAttendanceForEvent(ev) {
+  if (!ev) { students.forEach(s => { s.s = 'absent'; s.t = '—'; }); return; }
+  const { data, error } = await supabase.from('attendance').select('*').eq('event_id', ev.id);
+  if (error) { console.error(error); showToast('Could not load attendance: ' + error.message); return; }
+  const byUser = {};
+  (data || []).forEach(a => { byUser[a.user_id] = a; });
+  students.forEach(s => {
+    const a = s.userId ? byUser[s.userId] : null;
+    s.s = a ? a.status : 'absent';
+    s.t = a && a.checkin_at ? new Date(a.checkin_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+  });
+}
+
+// Teacher-side manual marking: click a today-list row to cycle its status.
+// Only available for members who've signed in at least once (see renderAll()).
+async function cycleAttendance(userId) {
+  const ev = pickTodayEvent();
+  if (!ev) { showToast('No event scheduled today.'); return; }
+  const s = students.find(st => st.userId === userId);
+  if (!s) return;
+  const order = ['present','late','absent'];
+  const next = order[(order.indexOf(s.s)+1) % order.length];
+  const payload = { event_id: ev.id, user_id: userId, ensemble_id: activeEns().id, status: next };
+  if (next === 'absent') { payload.checkin_at = null; payload.checkout_at = null; }
+  else payload.checkin_at = new Date().toISOString();
+  const { error } = await supabase.from('attendance').upsert(payload, { onConflict: 'event_id,user_id' });
+  if (error) { showToast('Could not update attendance: ' + error.message); return; }
+  s.s = next;
+  s.t = next === 'absent' ? '—' : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  renderAll();
+  renderTodayMetrics();
 }
 
 
@@ -3246,7 +3468,9 @@ function parseCalCSVLine(headers, values) {
     dress: row.dress || '',
     program: programPills,
     notes: row.notes || '',
-    dateObj: d
+    dateObj: d,
+    startTimeRaw: row.start_time || '',
+    endTimeRaw: row.end_time || '',
   };
 }
 
@@ -3298,19 +3522,40 @@ function handleCalCSV(input) {
   reader.readAsText(file);
 }
 
-function importCalCSV() {
+async function importCalCSV() {
   if(!parsedCalEvents.length) return;
   const replace = document.getElementById('cal-csv-replace').checked;
-  if(replace) {
-    evList.length = 0;
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    if (replace) {
+      const { error: delErr } = await supabase.from('events').delete().eq('ensemble_id', e.id);
+      if (delErr) { showToast('Could not clear calendar: ' + delErr.message); return; }
+    }
+    const rows = parsedCalEvents.map(ev => ({
+      ensemble_id: e.id, name: ev.n, type: ev.type, event_date: isoFromDateObj(ev.dateObj),
+      call_time: normalizeTimeTo24h(ev.callTime) || null,
+      start_time: normalizeTimeTo24h(ev.startTimeRaw) || null,
+      end_time: normalizeTimeTo24h(ev.endTimeRaw) || null,
+      venue: ev.venue || null, dress: ev.dress || null,
+      program: ev.program && ev.program.length ? ev.program : null, notes: ev.notes || null,
+    }));
+    const { error } = await supabase.from('events').insert(rows);
+    if (error) { showToast('Import failed: ' + error.message); return; }
+    await loadEventsFromDB(e);
+    loadEnsembleContext();
+  } else {
+    if(replace) evList.length = 0;
+    evList.push(...parsedCalEvents.map(ev => ({
+      n: ev.n, d: ev.d, t: ev.t, type: ev.type, dot: ev.dot,
+      venue: ev.venue, callTime: ev.callTime, dress: ev.dress,
+      program: ev.program, notes: ev.notes, dateObj: ev.dateObj
+    })));
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
   }
-  evList.push(...parsedCalEvents.map(ev => ({
-    n: ev.n, d: ev.d, t: ev.t, type: ev.type, dot: ev.dot,
-    venue: ev.venue, callTime: ev.callTime, dress: ev.dress,
-    program: ev.program, notes: ev.notes, dateObj: ev.dateObj
-  })));
-  evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-import');
   // Reset
   document.getElementById('cal-csv-zone').classList.remove('ok');
@@ -3330,10 +3575,19 @@ function filterCal(btn) {
   renderCal();
 }
 
-function clearCalendar() {
+async function clearCalendar() {
   if(!confirm('Clear all events from the calendar?')) return;
-  evList.length = 0;
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await supabase.from('events').delete().eq('ensemble_id', e.id);
+    if (error) { showToast('Could not clear calendar: ' + error.message); return; }
+    e.evList = [];
+    loadEnsembleContext();
+  } else {
+    evList.length = 0;
+  }
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   showToast('Calendar cleared.');
 }
 
@@ -3636,6 +3890,150 @@ async function loadEnsemblesFromDB() {
   activeEnsIdx = 0;
 }
 
+/* ═══════════════════════════════════════════
+   EVENTS + ATTENDANCE DATA LAYER (live mode)
+═══════════════════════════════════════════ */
+
+function isoFromDateObj(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function dispDateFromISO(iso) {
+  const d = new Date(iso + 'T00:00');
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
+}
+
+// Accepts "7:00 pm" / "7:00 PM" / "19:00" and returns 24h "HH:MM" (or '' if
+// unparseable). Needed because the calendar-edit modal (ce-*) and CSV import
+// both hold times as free-text 12h strings, but events.call_time/start_time/
+// end_time are stored as plain 24h text for fmt12() to read back reliably.
+function normalizeTimeTo24h(str) {
+  if (!str) return '';
+  const s = str.trim();
+  const ampm = s.match(/^(\d{1,2}):?(\d{2})?\s*([ap]m)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const min = ampm[2] || '00';
+    const suf = ampm[3].toLowerCase();
+    if (suf === 'pm' && h !== 12) h += 12;
+    if (suf === 'am' && h === 12) h = 0;
+    return String(h).padStart(2,'0') + ':' + min;
+  }
+  const hm = s.match(/^(\d{1,2}):(\d{2})$/);
+  return hm ? String(parseInt(hm[1],10)).padStart(2,'0') + ':' + hm[2] : '';
+}
+
+// Maps a DB `events` row into the shape renderCal()/renderStuSchedule()/
+// openCalEdit() already expect (see DEMO_ENSEMBLES/saveEvent() for the same
+// shape built by hand). startTime/endTime/callTimeRaw (24h) are kept
+// alongside the 12h display strings for prefilling <input type="time">
+// fields (the "Today's event" edit modal) without re-parsing "7:00 pm".
+function mapDbEvent(dbEv) {
+  return {
+    id: dbEv.id,
+    n: dbEv.name,
+    d: dispDateFromISO(dbEv.event_date),
+    t: dbEv.start_time && dbEv.end_time ? fmt12(dbEv.start_time) + '–' + fmt12(dbEv.end_time)
+       : dbEv.start_time ? fmt12(dbEv.start_time) : '',
+    type: dbEv.type || 'Rehearsal',
+    dot: typeDotMap[(dbEv.type||'').toLowerCase()] || 'ep',
+    venue: dbEv.venue || '',
+    callTime: dbEv.call_time ? fmt12(dbEv.call_time) : '',
+    dress: dbEv.dress || '',
+    program: dbEv.program || [],
+    notes: dbEv.notes || '',
+    dateObj: new Date(dbEv.event_date + 'T00:00'),
+    eventDate: dbEv.event_date,
+    startTime: dbEv.start_time || '',
+    endTime: dbEv.end_time || '',
+    callTimeRaw: dbEv.call_time || '',
+  };
+}
+
+async function loadEventsFromDB(e) {
+  const { data, error } = await supabase.from('events').select('*').eq('ensemble_id', e.id).order('event_date');
+  if (error) { console.error(error); showToast('Could not load events: ' + error.message); return; }
+  e.evList = (data || []).map(mapDbEvent);
+}
+
+// Shared by saveEvent()/saveCalEdit()/importCalCSV in live mode: upserts one
+// events row from the canonical field set, then reloads e.evList so every
+// reader (renderCal, renderTodayCard, renderStuSchedule) sees the real row
+// — including its DB-assigned id — instead of an optimistic local guess.
+async function upsertEventToDB(fields, existingId) {
+  const e = activeEns();
+  const payload = {
+    ensemble_id: e.id,
+    name: fields.name,
+    type: fields.type || 'Rehearsal',
+    event_date: fields.eventDate,
+    call_time: fields.callTime || null,
+    start_time: fields.startTime || null,
+    end_time: fields.endTime || null,
+    venue: fields.venue || null,
+    dress: fields.dress || null,
+    program: fields.program && fields.program.length ? fields.program : null,
+    notes: fields.notes || null,
+  };
+  const { error } = existingId
+    ? await supabase.from('events').update(payload).eq('id', existingId)
+    : await supabase.from('events').insert(payload);
+  if (error) { showToast('Could not save event: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+async function deleteEventFromDB(id) {
+  const e = activeEns();
+  const { error } = await supabase.from('events').delete().eq('id', id);
+  if (error) { showToast('Could not delete event: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+// Today's event for the active (live) ensemble: the one dated today if any,
+// else the soonest upcoming one. Returns null if nothing's scheduled from
+// today onward. Demo mode never calls this — its seed dates are fixed in
+// the past and its "Today's event" card is deliberately left untouched
+// (see renderTodayCard()).
+function pickTodayEvent() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = evList
+    .filter(e => e.dateObj && e.dateObj.getTime() >= today.getTime())
+    .sort((a,b) => a.dateObj - b.dateObj);
+  return upcoming[0] || null;
+}
+
+// Live-mode "impressive but optional" real-time (spec §2.3): the teacher's
+// Today view updates as students check in, without a refresh. Requires
+// migration 0004 (attendance added to the supabase_realtime publication).
+let attendanceChannel = null;
+
+function subscribeAttendanceRealtime(ensembleId) {
+  unsubscribeAttendanceRealtime();
+  attendanceChannel = supabase.channel('attendance-' + ensembleId)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'attendance', filter: `ensemble_id=eq.${ensembleId}` },
+      async (payload) => {
+        const ev = pickTodayEvent();
+        const row = payload.new || payload.old;
+        if (!ev || !row || row.event_id !== ev.id) return;
+        await loadAttendanceForEvent(ev);
+        renderAll();
+        renderTodayMetrics();
+      })
+    .subscribe();
+}
+
+function unsubscribeAttendanceRealtime() {
+  if (attendanceChannel) { supabase.removeChannel(attendanceChannel); attendanceChannel = null; }
+}
+
 function loadEnsembleContext() {
   const e = activeEns();
   // Point all global vars at the active ensemble
@@ -3794,11 +4192,17 @@ async function requestJoin(ensIdx) {
   showToast('Join request sent to ' + e.name + '!');
 }
 
-function enterEnsembleAsStudent(idx) {
+async function enterEnsembleAsStudent(idx) {
   lastRole = 'student';
   activeEnsIdx = idx;
+  const e = ensembles[idx];
+
+  // RLS blocks a student from seeing classmates' roster rows, so there's no
+  // loadRosterFromDB() call here — only events, which every active member
+  // may read.
+  if (dataMode === 'live') await loadEventsFromDB(e);
+
   loadEnsembleContext();
-  const e = activeEns();
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -3828,6 +4232,7 @@ function enterEnsembleAsStudent(idx) {
 
   renderAll();
   renderStuSchedule();
+  if (dataMode === 'live') await renderTodayCard();
 }
 
 async function enterEnsemble(idx) {
@@ -3836,11 +4241,16 @@ async function enterEnsemble(idx) {
   const e = ensembles[idx];
 
   // Only a teacher of this ensemble can see the full roster (RLS); fetch
-  // it before rendering so students/joinRequests are populated by the
-  // time loadEnsembleContext() copies them onto the global arrays.
-  if (dataMode === 'live') await loadRosterFromDB(e);
+  // it and events before rendering so students/joinRequests/evList are
+  // populated by the time loadEnsembleContext() copies them onto the
+  // global arrays.
+  if (dataMode === 'live') await Promise.all([loadRosterFromDB(e), loadEventsFromDB(e)]);
 
   loadEnsembleContext();
+
+  // Merge in today's real attendance now that both the roster and the
+  // event list are loaded (pickTodayEvent() reads the global evList).
+  if (dataMode === 'live') await loadAttendanceForEvent(pickTodayEvent());
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -3865,6 +4275,10 @@ async function enterEnsemble(idx) {
   renderRules();
   updPol();
   renderResources();
+  if (dataMode === 'live') {
+    await renderTodayCard();
+    subscribeAttendanceRealtime(e.id);
+  }
 }
 
 async function switchEnsemble(val) {
@@ -3876,6 +4290,7 @@ async function switchEnsemble(val) {
 }
 
 function goLanding() {
+  unsubscribeAttendanceRealtime();
   saveEnsembleContext();
   document.getElementById('ensemble-switcher').style.display = 'none';
   document.getElementById('topbar-brand').style.display = 'flex';
@@ -4325,6 +4740,7 @@ function enterApp() {
 // Resets the UI back to the login screen. Called after supabase.auth.signOut()
 // resolves (see signOut(), above) and on the SIGNED_OUT auth event.
 function resetToLogin() {
+  unsubscribeAttendanceRealtime();
   const soBtn = document.getElementById('signout-btn');
   if(soBtn) soBtn.style.display = 'none';
   document.getElementById('ensemble-switcher').style.display = 'none';

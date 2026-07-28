@@ -47,6 +47,10 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    email can't be invited to an ensemble twice, and a trigger on
    `auth.users` that backfills `user_id` the moment someone signs up with
    a matching email.
+4. `migrations/0004_attendance_realtime.sql` — adds `attendance` to the
+   `supabase_realtime` publication so the teacher's Today view can
+   subscribe to check-ins live (`supabase.channel(...).on('postgres_changes', ...)`)
+   instead of polling or requiring a refresh.
 
 ## 3. Enable email auth
 
