@@ -1876,15 +1876,15 @@ const SUPABASE_ANON_KEY = 'sb_publishable_YHXUpLTm7rFDU3yD1qnkYw_B5viCBor';
 const SUPABASE_CONFIGURED = SUPABASE_URL !== 'YOUR_SUPABASE_URL'
   && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
   && typeof window.supabase !== 'undefined';
-const supabase = SUPABASE_CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const sb = SUPABASE_CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 if (!SUPABASE_CONFIGURED) {
   console.warn('Supabase is not configured (see supabase/README.md) — magic-link sign-in is disabled; use "Skip for now (demo mode)" to explore the UI.');
 }
 
 let authSession = null; // the current Supabase auth session, kept in sync by onAuthStateChange
 
-if (supabase) {
-  supabase.auth.onAuthStateChange(async (event, newSession) => {
+if (sb) {
+  sb.auth.onAuthStateChange(async (event, newSession) => {
     authSession = newSession;
     if (newSession && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
       // Magic-link redirects land back here with #access_token=... in the URL — drop it once consumed.
@@ -1946,7 +1946,7 @@ async function sendMagicLink() {
     return;
   }
   emailInput.style.borderColor = 'rgba(255,255,255,.15)';
-  if (!supabase) {
+  if (!sb) {
     errEl.textContent = 'Supabase isn\'t configured yet — see supabase/README.md, or use "Skip for now (demo mode)" below.';
     errEl.style.display = 'block';
     return;
@@ -1954,7 +1954,7 @@ async function sendMagicLink() {
   btn.disabled = true;
   btn.style.opacity = '.6';
   localStorage.setItem('ct_login_role', loginRole); // read back in onAuthStateChange after the redirect
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await sb.auth.signInWithOtp({
     email,
     // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
     // from a QR scan — see genQR()/handleCheckinDeepLink()) so it survives
@@ -1975,7 +1975,7 @@ async function sendMagicLink() {
 }
 
 async function signOut() {
-  if (supabase) await supabase.auth.signOut();
+  if (sb) await sb.auth.signOut();
   resetToLogin();
 }
 
@@ -2214,13 +2214,13 @@ async function toggleCI(){
         const proceed = confirm('You appear to be about ' + fence.distance + 'm from the rehearsal location. Check in anyway?');
         if (!proceed) return;
       }
-      const { error } = await supabase.from('attendance').upsert({
+      const { error } = await sb.from('attendance').upsert({
         event_id: ev.id, user_id: authSession.user.id, ensemble_id: activeEns().id,
         status: 'present', checkin_at: new Date().toISOString(), checkout_at: null,
       }, { onConflict: 'event_id,user_id' });
       if (error) { showToast('Could not check in: ' + error.message); return; }
     } else {
-      const { error } = await supabase.from('attendance')
+      const { error } = await sb.from('attendance')
         .update({ checkout_at: new Date().toISOString() })
         .eq('event_id', ev.id).eq('user_id', authSession.user.id);
       if (error) { showToast('Could not check out: ' + error.message); return; }
@@ -2259,7 +2259,7 @@ function filterExc(f){renderExcuses();}
 // event_id — only attendance_id — so the event name/date come through a
 // nested select via attendance -> events.
 async function loadExcusesFromDB(e) {
-  const { data, error } = await supabase.from('excuses')
+  const { data, error } = await sb.from('excuses')
     .select('*, attendance(event_id, events(name, event_date))')
     .eq('ensemble_id', e.id).order('submitted_at', { ascending: false });
   if (error) { console.error(error); showToast('Could not load excuses: ' + error.message); return; }
@@ -2274,7 +2274,7 @@ async function loadExcusesFromDB(e) {
     // actually display it.
     let src = '';
     if (row.attachment_url) {
-      const { data: signed } = await supabase.storage.from('excuse-attachments')
+      const { data: signed } = await sb.storage.from('excuse-attachments')
         .createSignedUrl(row.attachment_url, 3600);
       src = signed?.signedUrl || '';
     }
@@ -2299,7 +2299,7 @@ async function loadExcusesFromDB(e) {
 // (excuses has no direct event_id). Powers openExcuseSubmit() below since
 // the submit-excuse modal has no picker UI for "which absence is this for".
 async function findMyMostRecentAbsence() {
-  const { data, error } = await supabase.from('attendance')
+  const { data, error } = await sb.from('attendance')
     .select('id, event_id, events(name, event_date)')
     .eq('user_id', authSession.user.id).eq('status', 'absent')
     .order('event_date', { foreignTable: 'events', ascending: false })
@@ -2334,7 +2334,7 @@ async function decideExc(d){
   const note = document.getElementById('rev-note').value;
 
   if (dataMode === 'live') {
-    const { error } = await supabase.from('excuses')
+    const { error } = await sb.from('excuses')
       .update({ status: d, teacher_note: note, reviewed_at: new Date().toISOString() })
       .eq('id', curExcId);
     if (error) { showToast('Could not save decision: ' + error.message); return; }
@@ -2393,12 +2393,12 @@ async function submitExc(){
     let attachmentPath = null;
     if (upFile) {
       const path = `${e.id}/${authSession.user.id}/${Date.now()}-${upFile.name}`;
-      const { error: upErr } = await supabase.storage.from('excuse-attachments').upload(path, upFile);
+      const { error: upErr } = await sb.storage.from('excuse-attachments').upload(path, upFile);
       if (upErr) { showToast('Could not upload attachment: ' + upErr.message); return; }
       attachmentPath = path;
     }
 
-    const { error } = await supabase.from('excuses').insert({
+    const { error } = await sb.from('excuses').insert({
       attendance_id: pendingExcuseTarget.attendanceId, user_id: authSession.user.id, ensemble_id: e.id,
       type, text: txt, attachment_url: attachmentPath, status: 'pending',
     });
@@ -2475,7 +2475,7 @@ function mapDbGradingPolicy(row) {
 }
 
 async function loadGradingPolicyFromDB(e) {
-  const { data, error } = await supabase.from('grading_policies').select('*').eq('ensemble_id', e.id).maybeSingle();
+  const { data, error } = await sb.from('grading_policies').select('*').eq('ensemble_id', e.id).maybeSingle();
   if (error) { console.error(error); return; }
   if (!data) return; // never saved yet — ensembleDefaults()' pol/gradeModel/letterRules stand
   const mapped = mapDbGradingPolicy(data);
@@ -2523,7 +2523,7 @@ async function saveGradingPolicy(id) {
     const lateWindow  = parseInt(document.querySelector('#late-chips .chip.on')?.dataset.v || 10);
     const excWindow   = parseInt(document.querySelector('#exc-win .chip.on')?.dataset.v || 48);
     const letterStyle = document.querySelector('#letter-style-btns .chip.on')?.dataset.v || 'half';
-    const { error } = await supabase.from('grading_policies').upsert({
+    const { error } = await sb.from('grading_policies').upsert({
       ensemble_id: e.id, model: gradeModel,
       free_absences: pol.free, fail_threshold: pol.fail, deduction_pct: pol.ded, tardies_per_absence: pol.tardy,
       exclude_excused_absences: pol.excludeExcused,
@@ -2594,7 +2594,7 @@ function mapDbRule(row) {
 }
 
 async function loadNotificationRulesFromDB(e) {
-  const { data, error } = await supabase.from('notification_rules').select('*').eq('ensemble_id', e.id);
+  const { data, error } = await sb.from('notification_rules').select('*').eq('ensemble_id', e.id);
   if (error) { console.error(error); showToast('Could not load notification rules: ' + error.message); return; }
   e.rules = (data || []).map(mapDbRule);
 }
@@ -2603,7 +2603,7 @@ async function togRule(id){
   const r=rules.find(r=>r.id===id); if(!r) return;
   r.on=!r.on;
   if (dataMode === 'live') {
-    const { error } = await supabase.from('notification_rules').update({ enabled: r.on }).eq('id', id);
+    const { error } = await sb.from('notification_rules').update({ enabled: r.on }).eq('id', id);
     if (error) { showToast('Could not update rule: ' + error.message); r.on=!r.on; renderRules(); return; }
   }
   renderRules();
@@ -2615,14 +2615,14 @@ async function updRule(id,k,v){
     const colMap = { trig: 'trigger', off: 'offset_value', unit: 'offset_unit', tpl: 'template_key', lbl: 'label' };
     const col = colMap[k];
     if (!col) return;
-    const { error } = await supabase.from('notification_rules')
+    const { error } = await sb.from('notification_rules')
       .update({ [col]: k === 'off' ? parseInt(v) : v }).eq('id', id);
     if (error) showToast('Could not update rule: ' + error.message);
   }
 }
 async function delRule(id){
   if (dataMode === 'live') {
-    const { error } = await supabase.from('notification_rules').delete().eq('id', id);
+    const { error } = await sb.from('notification_rules').delete().eq('id', id);
     if (error) { showToast('Could not delete rule: ' + error.message); return; }
   }
   rules=rules.filter(r=>r.id!==id);
@@ -2631,7 +2631,7 @@ async function delRule(id){
 async function addRule(){
   if (dataMode === 'live') {
     const e = activeEns();
-    const { data, error } = await supabase.from('notification_rules').insert({
+    const { data, error } = await sb.from('notification_rules').insert({
       ensemble_id: e.id, label: 'New rule', enabled: true, trigger: 'end_of_event',
       offset_value: 0, offset_unit: 'min', template_key: 'absence',
     }).select().single();
@@ -2845,7 +2845,7 @@ async function importCSV() {
 // roster so e.students/students[] reflect what actually landed in the DB.
 async function insertRosterMembers(rows) {
   const e = activeEns();
-  const { error } = await supabase.from('ensemble_members').insert(rows.map(s => ({
+  const { error } = await sb.from('ensemble_members').insert(rows.map(s => ({
     ensemble_id: e.id, name: s.n, email: s.e || null, part: s.r,
     role: 'student', status: 'active',
   })));
@@ -2863,7 +2863,7 @@ async function addStudent() {
 
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('ensemble_members').insert({
+    const { error } = await sb.from('ensemble_members').insert({
       ensemble_id: e.id, name: n, email: email || null, part: r,
       role: 'student', status: 'active',
     });
@@ -3636,7 +3636,7 @@ function mapDbResource(r) {
 }
 
 async function loadResourcesFromDB(e) {
-  const { data, error } = await supabase.from('resources').select('*').eq('ensemble_id', e.id).order('created_at');
+  const { data, error } = await sb.from('resources').select('*').eq('ensemble_id', e.id).order('created_at');
   if (error) { console.error(error); showToast('Could not load resources: ' + error.message); return; }
   e.resources = (data || []).map(mapDbResource);
 }
@@ -3646,7 +3646,7 @@ async function saveDriveLink() {
   if(!url) { alert('Please enter a URL.'); return; }
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('ensembles').update({ drive_url: url }).eq('id', e.id);
+    const { error } = await sb.from('ensembles').update({ drive_url: url }).eq('id', e.id);
     if (error) { showToast('Could not save Drive link: ' + error.message); return; }
     e.driveURL = url;
   }
@@ -3669,7 +3669,7 @@ async function saveResource() {
 
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('resources').insert({
+    const { error } = await sb.from('resources').insert({
       ensemble_id: e.id, title, type, url, description: desc || null,
     });
     if (error) { showToast('Could not add resource: ' + error.message); return; }
@@ -3690,7 +3690,7 @@ async function deleteResource(id) {
   if(!confirm('Remove this resource?')) return;
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('resources').delete().eq('id', id);
+    const { error } = await sb.from('resources').delete().eq('id', id);
     if (error) { showToast('Could not remove resource: ' + error.message); return; }
     await loadResourcesFromDB(e);
     loadEnsembleContext();
@@ -3871,7 +3871,7 @@ async function syncCheckInRing(ev) {
   }
   ring.style.opacity = '';
   ring.style.pointerEvents = '';
-  const { data } = await supabase.from('attendance').select('*')
+  const { data } = await sb.from('attendance').select('*')
     .eq('event_id', ev.id).eq('user_id', authSession.user.id).maybeSingle();
   const icon = document.getElementById('ci-icon'), lbl = document.getElementById('ci-lbl'), tm = document.getElementById('ci-time');
   if (data && data.checkin_at && !data.checkout_at) {
@@ -3890,7 +3890,7 @@ async function syncCheckInRing(ev) {
 // No event today, or a member with no attendance row, both read as absent.
 async function loadAttendanceForEvent(ev) {
   if (!ev) { students.forEach(s => { s.s = 'absent'; s.t = '—'; }); return; }
-  const { data, error } = await supabase.from('attendance').select('*').eq('event_id', ev.id);
+  const { data, error } = await sb.from('attendance').select('*').eq('event_id', ev.id);
   if (error) { console.error(error); showToast('Could not load attendance: ' + error.message); return; }
   const byUser = {};
   (data || []).forEach(a => { byUser[a.user_id] = a; });
@@ -3913,7 +3913,7 @@ async function cycleAttendance(userId) {
   const payload = { event_id: ev.id, user_id: userId, ensemble_id: activeEns().id, status: next };
   if (next === 'absent') { payload.checkin_at = null; payload.checkout_at = null; }
   else payload.checkin_at = new Date().toISOString();
-  const { error } = await supabase.from('attendance').upsert(payload, { onConflict: 'event_id,user_id' });
+  const { error } = await sb.from('attendance').upsert(payload, { onConflict: 'event_id,user_id' });
   if (error) { showToast('Could not update attendance: ' + error.message); return; }
   s.s = next;
   s.t = next === 'absent' ? '—' : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
@@ -4078,7 +4078,7 @@ async function importCalCSV() {
   if (dataMode === 'live') {
     const e = activeEns();
     if (replace) {
-      const { error: delErr } = await supabase.from('events').delete().eq('ensemble_id', e.id);
+      const { error: delErr } = await sb.from('events').delete().eq('ensemble_id', e.id);
       if (delErr) { showToast('Could not clear calendar: ' + delErr.message); return; }
     }
     const rows = parsedCalEvents.map(ev => ({
@@ -4089,7 +4089,7 @@ async function importCalCSV() {
       venue: ev.venue || null, dress: ev.dress || null,
       program: ev.program && ev.program.length ? ev.program : null, notes: ev.notes || null,
     }));
-    const { error } = await supabase.from('events').insert(rows);
+    const { error } = await sb.from('events').insert(rows);
     if (error) { showToast('Import failed: ' + error.message); return; }
     await loadEventsFromDB(e);
     loadEnsembleContext();
@@ -4128,7 +4128,7 @@ async function clearCalendar() {
   if(!confirm('Clear all events from the calendar?')) return;
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('events').delete().eq('ensemble_id', e.id);
+    const { error } = await sb.from('events').delete().eq('ensemble_id', e.id);
     if (error) { showToast('Could not clear calendar: ' + error.message); return; }
     e.evList = [];
     loadEnsembleContext();
@@ -4439,13 +4439,13 @@ function mapMemberToJoinRequest(m) {
 // it can never drift out of sync with what actually happened at check-in).
 async function loadRosterFromDB(e) {
   const [membersRes, absenceRes, excusedRes, presentRes] = await Promise.all([
-    supabase.from('ensemble_members').select('*').eq('ensemble_id', e.id),
-    supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
+    sb.from('ensemble_members').select('*').eq('ensemble_id', e.id),
+    sb.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
     // Approved-excuse count per student — feeds gradedAbsences() below when
     // the policy excludes excused absences from the grade math.
-    supabase.from('excuses').select('user_id').eq('ensemble_id', e.id).eq('status', 'approved'),
+    sb.from('excuses').select('user_id').eq('ensemble_id', e.id).eq('status', 'approved'),
     // Rehearsals actually attended — feeds pointsBalance() in "earn" mode.
-    supabase.from('attendance').select('user_id').eq('ensemble_id', e.id).in('status', ['present', 'late']),
+    sb.from('attendance').select('user_id').eq('ensemble_id', e.id).in('status', ['present', 'late']),
   ]);
   if (membersRes.error) { console.error(membersRes.error); showToast('Could not load roster: ' + membersRes.error.message); return; }
   const rows = membersRes.data || [];
@@ -4467,9 +4467,9 @@ async function loadRosterFromDB(e) {
 async function loadEnsemblesFromDB() {
   const uid = authSession.user.id;
   const [ensRes, myRes, studentCountRes] = await Promise.all([
-    supabase.from('ensembles').select('*').order('created_at'),
-    supabase.from('ensemble_members').select('*').eq('user_id', uid),
-    supabase.from('ensemble_members').select('ensemble_id').eq('role', 'student').eq('status', 'active'),
+    sb.from('ensembles').select('*').order('created_at'),
+    sb.from('ensemble_members').select('*').eq('user_id', uid),
+    sb.from('ensemble_members').select('ensemble_id').eq('role', 'student').eq('status', 'active'),
   ]);
   if (ensRes.error || myRes.error) {
     console.error(ensRes.error || myRes.error);
@@ -4555,7 +4555,7 @@ function mapDbEvent(dbEv) {
 }
 
 async function loadEventsFromDB(e) {
-  const { data, error } = await supabase.from('events').select('*').eq('ensemble_id', e.id).order('event_date');
+  const { data, error } = await sb.from('events').select('*').eq('ensemble_id', e.id).order('event_date');
   if (error) { console.error(error); showToast('Could not load events: ' + error.message); return; }
   e.evList = (data || []).map(mapDbEvent);
 }
@@ -4583,8 +4583,8 @@ async function upsertEventToDB(fields, existingId) {
     geo_radius: fields.geoRadius || 50,
   };
   const { error } = existingId
-    ? await supabase.from('events').update(payload).eq('id', existingId)
-    : await supabase.from('events').insert(payload);
+    ? await sb.from('events').update(payload).eq('id', existingId)
+    : await sb.from('events').insert(payload);
   if (error) { showToast('Could not save event: ' + error.message); return false; }
   await loadEventsFromDB(e);
   loadEnsembleContext();
@@ -4685,7 +4685,7 @@ async function insertRecurringEvents(fields, dates) {
     geo_lng: fields.geoLng ?? null,
     geo_radius: fields.geoRadius || 50,
   }));
-  const { error } = await supabase.from('events').insert(rows);
+  const { error } = await sb.from('events').insert(rows);
   if (error) { showToast('Could not save events: ' + error.message); return false; }
   await loadEventsFromDB(e);
   loadEnsembleContext();
@@ -4694,7 +4694,7 @@ async function insertRecurringEvents(fields, dates) {
 
 async function deleteEventFromDB(id) {
   const e = activeEns();
-  const { error } = await supabase.from('events').delete().eq('id', id);
+  const { error } = await sb.from('events').delete().eq('id', id);
   if (error) { showToast('Could not delete event: ' + error.message); return false; }
   await loadEventsFromDB(e);
   loadEnsembleContext();
@@ -4773,7 +4773,7 @@ let attendanceChannel = null;
 
 function subscribeAttendanceRealtime(ensembleId) {
   unsubscribeAttendanceRealtime();
-  attendanceChannel = supabase.channel('attendance-' + ensembleId)
+  attendanceChannel = sb.channel('attendance-' + ensembleId)
     .on('postgres_changes',
       { event: '*', schema: 'public', table: 'attendance', filter: `ensemble_id=eq.${ensembleId}` },
       async (payload) => {
@@ -4788,7 +4788,7 @@ function subscribeAttendanceRealtime(ensembleId) {
 }
 
 function unsubscribeAttendanceRealtime() {
-  if (attendanceChannel) { supabase.removeChannel(attendanceChannel); attendanceChannel = null; }
+  if (attendanceChannel) { sb.removeChannel(attendanceChannel); attendanceChannel = null; }
 }
 
 function loadEnsembleContext() {
@@ -4940,7 +4940,7 @@ function renderStudentLanding(skipAutoEnter) {
 async function requestJoin(ensIdx) {
   const e = ensembles[ensIdx];
   if (dataMode === 'live') {
-    const { error } = await supabase.from('ensemble_members').insert({
+    const { error } = await sb.from('ensemble_members').insert({
       ensemble_id: e.id, user_id: authSession.user.id,
       email: currentStudent.email, name: currentStudent.name,
       role: 'student', status: 'pending',
@@ -5156,7 +5156,7 @@ async function finishWizard() {
 
   let newEns;
   if (dataMode === 'live') {
-    const { data: dbEns, error: ensErr } = await supabase.from('ensembles').insert({
+    const { data: dbEns, error: ensErr } = await sb.from('ensembles').insert({
       name, sub, term, teacher_name: teacher, teacher_email: email,
       color: wizColor, description: desc, schedule, drive_url: driveURL,
       created_by: authSession.user.id,
@@ -5169,7 +5169,7 @@ async function finishWizard() {
     }).select().single();
     if (ensErr) { showToast('Could not create ensemble: ' + ensErr.message); return; }
 
-    const { error: memErr } = await supabase.from('ensemble_members').insert({
+    const { error: memErr } = await sb.from('ensemble_members').insert({
       ensemble_id: dbEns.id, user_id: authSession.user.id, role: 'teacher', status: 'active',
     });
     if (memErr) { showToast('Ensemble created, but could not set you as its teacher: ' + memErr.message); }
@@ -5179,7 +5179,7 @@ async function finishWizard() {
     // opened Settings > Grading and clicked Save, which meant "decide this
     // in the wizard" silently didn't stick for the excused-absences choice
     // (or free/fail/ded/tardy) until then.
-    const { error: gpErr } = await supabase.from('grading_policies').insert({
+    const { error: gpErr } = await sb.from('grading_policies').insert({
       ensemble_id: dbEns.id, free_absences: pol.free, fail_threshold: pol.fail,
       deduction_pct: pol.ded, tardies_per_absence: pol.tardy, exclude_excused_absences: pol.excludeExcused,
     });
@@ -5238,7 +5238,7 @@ async function approveJoin(email) {
   const req = (e.joinRequests||[]).find(r=>r.email===email);
   if(!req) return;
   if (dataMode === 'live') {
-    const { error } = await supabase.from('ensemble_members')
+    const { error } = await sb.from('ensemble_members')
       .update({ status: 'active' }).eq('ensemble_id', e.id).eq('email', email);
     if (error) { showToast('Could not approve: ' + error.message); return; }
     await loadRosterFromDB(e);
@@ -5267,7 +5267,7 @@ async function denyJoin(email) {
   const req = (e.joinRequests||[]).find(r=>r.email===email);
   if(!req) return;
   if (dataMode === 'live') {
-    const { error } = await supabase.from('ensemble_members')
+    const { error } = await sb.from('ensemble_members')
       .update({ status: 'denied' }).eq('ensemble_id', e.id).eq('email', email);
     if (error) { showToast('Could not deny: ' + error.message); return; }
     await loadRosterFromDB(e);
@@ -5301,7 +5301,7 @@ async function loadRehearsalNotesForEvent(ev) {
   const preEl = document.getElementById('pre-notes');
   const postEl = document.getElementById('post-notes');
   if (!ev) { if (preEl) preEl.value = ''; if (postEl) postEl.value = ''; return; }
-  const { data, error } = await supabase.from('rehearsal_notes').select('*').eq('event_id', ev.id).maybeSingle();
+  const { data, error } = await sb.from('rehearsal_notes').select('*').eq('event_id', ev.id).maybeSingle();
   if (error) { console.error(error); return; }
   if (preEl) preEl.value = data?.pre_notes || '';
   if (postEl) postEl.value = data?.post_notes || '';
@@ -5313,7 +5313,7 @@ async function savePreNotes() {
     const ev = pickTodayEvent();
     if (!ev) { showToast('No event scheduled today.'); return; }
     const text = document.getElementById('pre-notes')?.value || '';
-    const { error } = await supabase.from('rehearsal_notes')
+    const { error } = await sb.from('rehearsal_notes')
       .upsert({ event_id: ev.id, ensemble_id: activeEns().id, pre_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
     if (error) { showToast('Could not save notes: ' + error.message); return; }
   }
@@ -5326,7 +5326,7 @@ async function savePostNotes() {
     const ev = pickTodayEvent();
     if (!ev) { showToast('No event scheduled today.'); return; }
     const text = document.getElementById('post-notes')?.value || '';
-    const { error } = await supabase.from('rehearsal_notes')
+    const { error } = await sb.from('rehearsal_notes')
       .upsert({ event_id: ev.id, ensemble_id: activeEns().id, post_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
     if (error) { showToast('Could not save notes: ' + error.message); return; }
   }
@@ -5376,7 +5376,7 @@ async function sendPostEmail() {
     const ev = pickTodayEvent();
     if (ev) {
       const rawNotes = document.getElementById('post-notes')?.value || '';
-      const { error } = await supabase.from('rehearsal_notes').upsert({
+      const { error } = await sb.from('rehearsal_notes').upsert({
         event_id: ev.id, ensemble_id: activeEns().id, post_notes: rawNotes, post_sent_at: new Date().toISOString(),
       }, { onConflict: 'event_id' });
       if (error) console.error(error);
@@ -5430,7 +5430,7 @@ function mapDbTemplate(row) {
 // has edited, plus any custom_* ones) and layers them over the defaults so
 // a never-touched built-in still renders correctly.
 async function loadTemplatesFromDB(e) {
-  const { data, error } = await supabase.from('email_templates').select('*').eq('ensemble_id', e.id);
+  const { data, error } = await sb.from('email_templates').select('*').eq('ensemble_id', e.id);
   if (error) { console.error(error); showToast('Could not load templates: ' + error.message); return; }
   const loaded = {};
   (data || []).forEach(row => { loaded[row.key] = mapDbTemplate(row); });
@@ -5441,7 +5441,7 @@ async function loadTemplatesFromDB(e) {
 
 async function upsertTemplateToDB(key, subject, body) {
   const e = activeEns();
-  const { error } = await supabase.from('email_templates')
+  const { error } = await sb.from('email_templates')
     .upsert({ ensemble_id: e.id, key, subject, body }, { onConflict: 'ensemble_id,key' });
   if (error) { showToast('Could not save template: ' + error.message); return false; }
   return true;
@@ -5483,7 +5483,7 @@ async function deleteCustomTpl(key) {
   if(!confirm('Delete this template?')) return;
   if (dataMode === 'live') {
     const e = activeEns();
-    const { error } = await supabase.from('email_templates').delete().eq('ensemble_id', e.id).eq('key', key);
+    const { error } = await sb.from('email_templates').delete().eq('ensemble_id', e.id).eq('key', key);
     if (error) { showToast('Could not delete template: ' + error.message); return; }
   }
   delete tpls[key];
@@ -5649,7 +5649,7 @@ function enterApp() {
   }
 }
 
-// Resets the UI back to the login screen. Called after supabase.auth.signOut()
+// Resets the UI back to the login screen. Called after sb.auth.signOut()
 // resolves (see signOut(), above) and on the SIGNED_OUT auth event.
 function resetToLogin() {
   unsubscribeAttendanceRealtime();
