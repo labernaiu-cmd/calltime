@@ -293,7 +293,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
 
     <!-- Role toggle on landing -->
-    <div style="display:flex;background:var(--s2);border-radius:var(--rs);padding:3px;gap:3px;margin-bottom:1.5rem">
+    <div id="landing-role-toggle" style="display:flex;background:var(--s2);border-radius:var(--rs);padding:3px;gap:3px;margin-bottom:1.5rem">
       <button class="rbtn on" id="land-teacher-btn" onclick="setLandingRole('teacher',this)" style="flex:1;justify-content:center">Teacher</button>
       <button class="rbtn" id="land-student-btn" onclick="setLandingRole('student',this)" style="flex:1;justify-content:center">Student</button>
     </div>
@@ -4835,6 +4835,17 @@ function saveEnsembleContext() {
 let landingRole = 'teacher';
 let lastRole = 'teacher'; // tracks whether user entered as teacher or student
 
+// Whether this account should see the Teacher/Student toggle (and the
+// "Create Ensemble" affordance) on the landing page at all. A brand-new
+// student who picked "Student" at sign-in has no business seeing teacher
+// tools; but an account that actually teaches something — or that picked
+// "Teacher" at sign-in, since that's how a first-time teacher gets to
+// "Create Ensemble" — still needs it. Demo mode always shows both, since
+// it's for exploring the whole app rather than a real single-role account.
+function canTeach() {
+  return dataMode !== 'live' || loginRole === 'teacher' || ensembles.some(e => e.myRole === 'teacher');
+}
+
 function setLandingRole(role, btn, skipAutoEnter) {
   landingRole = role;
   document.querySelectorAll('#view-landing .rbtn').forEach(b=>b.classList.remove('on'));
@@ -4953,6 +4964,12 @@ async function requestJoin(ensIdx) {
     });
     if (error) { showToast('Could not send request: ' + error.message); return; }
     e.joinRequests = [{ name: currentStudent.name, email: currentStudent.email, status: 'pending' }];
+    // Fire-and-forget — the teacher wouldn't otherwise know a request is
+    // sitting in their Roster tab until they happen to open the app.
+    if (e.email) {
+      sendEmail(e.email, `${currentStudent.name} wants to join ${e.name}`,
+        `${currentStudent.name} (${currentStudent.email}) requested to join ${e.name} on Call Time.\n\nOpen Call Time > Roster to approve or deny the request.`);
+    }
   } else {
     if(!e.joinRequests) e.joinRequests = [];
     e.joinRequests.push({
@@ -5105,8 +5122,10 @@ function goLanding() {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
   document.getElementById('view-landing').classList.add('show');
   renderLanding();
+  const toggleEl = document.getElementById('landing-role-toggle');
+  if(toggleEl) toggleEl.style.display = canTeach() ? 'flex' : 'none';
   // Restore the correct role tab
-  if(lastRole === 'student') {
+  if(lastRole === 'student' || !canTeach()) {
     const stuBtn = document.getElementById('land-student-btn');
     if(stuBtn) setLandingRole('student', stuBtn, true); // true = skipAutoEnter
   } else {
@@ -5251,6 +5270,8 @@ async function approveJoin(email) {
     loadEnsembleContext();
     document.getElementById('roster-count').textContent = students.length;
     renderRoster();
+    sendEmail(email, `You're in! Welcome to ${e.name}`,
+      `Hi ${req.name},\n\nYour request to join ${e.name} on Call Time was approved. Sign in at Call Time to see rehearsal schedules, check in, and more.`);
   } else {
     req.status = 'approved';
     if(!e.enrolledStudentEmails) e.enrolledStudentEmails = [];
@@ -5278,6 +5299,8 @@ async function denyJoin(email) {
     if (error) { showToast('Could not deny: ' + error.message); return; }
     await loadRosterFromDB(e);
     loadEnsembleContext();
+    sendEmail(email, `Update on your ${e.name} request`,
+      `Hi ${req.name},\n\nYour request to join ${e.name} on Call Time was not approved. Reach out to ${e.teacher || 'the director'} if you have questions.`);
   } else {
     req.status = 'denied';
   }
@@ -5646,7 +5669,9 @@ function enterApp() {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
   document.getElementById('view-landing').classList.add('show');
   renderLanding();
-  if(loginRole === 'student') {
+  const toggleEl = document.getElementById('landing-role-toggle');
+  if(toggleEl) toggleEl.style.display = canTeach() ? 'flex' : 'none';
+  if(loginRole === 'student' || !canTeach()) {
     const stuBtn = document.getElementById('land-student-btn');
     if(stuBtn) setLandingRole('student', stuBtn, false);
   } else {
