@@ -1036,18 +1036,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <div style="font-size:13px;font-weight:600">Absence limit</div>
-          <div style="font-size:13px;font-weight:600;color:var(--am)">2 of 4 used</div>
+          <div style="font-size:13px;font-weight:600;color:var(--am)" id="stu-limit-used">2 of 4 used</div>
         </div>
-        <div class="ptrack" style="height:8px;margin-bottom:8px"><div class="pfill" style="width:50%;background:#EF9F27"></div></div>
-        <div style="font-size:12px;color:var(--t2)">2 free absences remaining before grade is affected. Each additional absence deducts <strong>5%</strong>.</div>
+        <div class="ptrack" style="height:8px;margin-bottom:8px"><div class="pfill" id="stu-limit-fill" style="width:50%;background:#EF9F27"></div></div>
+        <div style="font-size:12px;color:var(--t2)" id="stu-limit-note">2 free absences remaining before grade is affected. Each additional absence deducts <strong>5%</strong>.</div>
       </div>
 
       <!-- Stats row -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--gn)">21</div><div class="mlbl">Present</div></div>
-        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--am)">1</div><div class="mlbl">Late</div></div>
-        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--rd)">2</div><div class="mlbl">Absent</div></div>
-        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--gn)">1</div><div class="mlbl">Excused</div></div>
+        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--gn)" id="stu-present-ct">21</div><div class="mlbl">Present</div></div>
+        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--am)" id="stu-late-ct">1</div><div class="mlbl">Late</div></div>
+        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--rd)" id="stu-absent-ct">2</div><div class="mlbl">Absent</div></div>
+        <div class="metric" style="text-align:center"><div class="mval" style="font-size:20px;color:var(--gn)" id="stu-excused-ct">1</div><div class="mlbl">Excused</div></div>
       </div>
 
       <!-- History timeline -->
@@ -2145,7 +2145,9 @@ function renderAll(){
   }).join('');
   renderCal();
   renderRoster();renderExcuses();renderLog();
-  const stuTlEl = document.getElementById('stu-tl'); if(stuTlEl) stuTlEl.innerHTML=tlData.map(t=>`<div class="tli"><div class="tldot ${t.s==='absent'?'ab':t.s==='late'?'la':''}"></div><div class="tldate">${t.d}</div><div class="tllbl">${t.l} ${bdg(t.s)}${t.ex?'&nbsp;'+excBdg(t.ex):''}</div></div>`).join('');
+  // The student Attendance tab (#stu-tl and friends) is lazy-rendered from
+  // switchStuTab() instead of here — see renderStuAttendance() — since in
+  // live mode it needs an async DB query, not just a sync map over tlData.
 }
 
 function renderRoster(){
@@ -4396,9 +4398,10 @@ function switchStuTab(id, btn) {
   document.querySelectorAll('.stupane').forEach(p=>p.classList.remove('show'));
   btn.classList.add('on');
   document.getElementById('stu-'+id).classList.add('show');
-  if(id==='schedule')  renderStuSchedule();
-  if(id==='excuses')   renderStuExcuses();
-  if(id==='resources') renderStuResources();
+  if(id==='schedule')   renderStuSchedule();
+  if(id==='attendance') renderStuAttendance(activeEns());
+  if(id==='excuses')    renderStuExcuses();
+  if(id==='resources')  renderStuResources();
 }
 
 function renderStuSchedule() {
@@ -5216,6 +5219,65 @@ async function updateStudentBadge(e) {
   const excused = (excusedRows||[]).length;
   const count = pol.excludeExcused ? Math.max(0, raw - excused) : raw;
   badge.textContent = count + ' absence' + (count!==1?'s':'');
+}
+
+// The signed-in student's own attendance rows, newest first — RLS lets an
+// active member read their own attendance/excuses rows (never a
+// classmate's). excuses(status) is a reverse-FK embed (excuses.attendance_id
+// references attendance.id) so each row already carries its own excuse
+// decision, if one was ever filed, with no second round trip needed.
+async function loadMyAttendanceHistory(e) {
+  const { data, error } = await sb.from('attendance')
+    .select('status, events(name, event_date), excuses(status)')
+    .eq('ensemble_id', e.id).eq('user_id', authSession.user.id)
+    .order('event_date', { foreignTable: 'events', ascending: false });
+  if (error) { console.error(error); return []; }
+  return (data || []).filter(row => row.events).map(row => ({
+    l: row.events.name,
+    d: dispDateFromISO(row.events.event_date),
+    s: row.status,
+    ex: row.excuses && row.excuses.length ? row.excuses[0].status : null,
+  }));
+}
+
+// Fills in the Attendance tab — the grade-impact bar, the Present/Late/
+// Absent/Excused stats row, and the history timeline (#stu-tl) — all of
+// which were previously static HTML built from tlData, the sample
+// mockup data, with nothing in live mode ever replacing it.
+async function renderStuAttendance(e) {
+  const tlEl = document.getElementById('stu-tl');
+  if (!tlEl) return;
+  if (dataMode !== 'live') {
+    tlEl.innerHTML = tlData.map(t=>`<div class="tli"><div class="tldot ${t.s==='absent'?'ab':t.s==='late'?'la':''}"></div><div class="tldate">${t.d}</div><div class="tllbl">${t.l} ${bdg(t.s)}${t.ex?'&nbsp;'+excBdg(t.ex):''}</div></div>`).join('');
+    return; // the impact bar / stats row keep their static demo numbers
+  }
+  if (!e) return;
+  const rows = await loadMyAttendanceHistory(e);
+  const present = rows.filter(r=>r.s==='present').length;
+  const late    = rows.filter(r=>r.s==='late').length;
+  const absent  = rows.filter(r=>r.s==='absent').length;
+  const excused = rows.filter(r=>r.s==='absent' && r.ex==='approved').length;
+  const graded  = pol.excludeExcused ? Math.max(0, absent - excused) : absent;
+
+  const presentEl = document.getElementById('stu-present-ct'); if (presentEl) presentEl.textContent = present;
+  const lateEl    = document.getElementById('stu-late-ct');    if (lateEl)    lateEl.textContent = late;
+  const absentEl  = document.getElementById('stu-absent-ct');  if (absentEl)  absentEl.textContent = absent;
+  const excusedEl = document.getElementById('stu-excused-ct'); if (excusedEl) excusedEl.textContent = excused;
+
+  const pct = pol.fail ? Math.min(100, Math.round((graded / pol.fail) * 100)) : 0;
+  const fillColor = graded >= pol.fail ? '#E24B4A' : graded > pol.free ? '#EF9F27' : '#63A322';
+  const fillEl = document.getElementById('stu-limit-fill');
+  if (fillEl) { fillEl.style.width = pct + '%'; fillEl.style.background = fillColor; }
+  const usedEl = document.getElementById('stu-limit-used');
+  if (usedEl) usedEl.textContent = `${graded} of ${pol.fail} used`;
+  const noteEl = document.getElementById('stu-limit-note');
+  if (noteEl) noteEl.innerHTML = graded >= pol.fail
+    ? `You've reached the failing-risk threshold — talk to ${e.teacher || 'your director'} about next steps.`
+    : `${Math.max(0, pol.free - graded)} free absence${Math.max(0, pol.free - graded)!==1?'s':''} remaining before grade is affected. Each additional absence deducts <strong>${pol.ded}%</strong>.`;
+
+  tlEl.innerHTML = rows.length
+    ? rows.map(t=>`<div class="tli"><div class="tldot ${t.s==='absent'?'ab':t.s==='late'?'la':''}"></div><div class="tldate">${t.d}</div><div class="tllbl">${t.l} ${bdg(t.s)}${t.ex?'&nbsp;'+excBdg(t.ex):''}</div></div>`).join('')
+    : '<div style="font-size:13px;color:var(--t3);padding:12px 0">No attendance recorded yet.</div>';
 }
 
 function openEditName() {
