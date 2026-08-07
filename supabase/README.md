@@ -1,7 +1,7 @@
 # Supabase setup
 
-> This file covers the database only. For Resend (email) and Vercel
-> (hosting) setup, see the root [`README.md`](../README.md).
+> This file covers the database only. For app email (Gmail SMTP) and
+> Vercel (hosting) setup, see the root [`README.md`](../README.md).
 
 ## 1. Create the project
 

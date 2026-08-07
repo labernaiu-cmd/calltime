@@ -13,10 +13,9 @@
 // which Vercel sends automatically as `Authorization: Bearer $CRON_SECRET`
 // for scheduled invocations once that env var is set.
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
+import { sendMail } from '../_mailer.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 function renderTokens(text, values) {
   let out = text || '';
@@ -47,18 +46,6 @@ function tzOffsetMinutes(date, tz) {
   const hour = parts.hour === '24' ? '00' : parts.hour;
   const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, hour, parts.minute, parts.second);
   return (asUtc - date.getTime()) / 60000;
-}
-
-async function sendMail(to, subject, body) {
-  try {
-    // See api/send-email.js's matching comment — swap for a verified-domain
-    // address once one's approved for sending to real students.
-    await resend.emails.send({ from: 'Call Time <onboarding@resend.dev>', to, subject, text: body });
-    return true;
-  } catch (err) {
-    console.error('resend send failed', err);
-    return false;
-  }
 }
 
 export default async function handler(req, res) {

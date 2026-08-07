@@ -2,8 +2,9 @@
 
 Rehearsal attendance management for performing ensembles — magic-link auth,
 real-time check-in/out, geofencing, and email notifications, all on
-Supabase + Vercel + Resend. See `calltime-spec.md` for the original
-technical handoff this was built from.
+Supabase + Vercel + Gmail SMTP. See `calltime-spec.md` for the original
+technical handoff this was built from (it specs Resend for email; this
+build sends through Gmail SMTP instead — see step 2 below for why).
 
 The whole frontend is one file, `calltime.html` — no build step. It runs in
 two modes:
@@ -17,7 +18,7 @@ two modes:
 1. **Database** — see [`supabase/README.md`](supabase/README.md): create
    the Supabase project, run the migrations, enable email auth, and drop
    your project URL/anon key into `calltime.html`.
-2. **Email** (Resend) — see below.
+2. **Email** (Gmail SMTP) — see below.
 3. **Scheduled jobs** — see below. Optional; only auto-checkout and two of
    the notification rules depend on it.
 4. **Deploy** (Vercel) — see below.
@@ -26,25 +27,36 @@ None of steps 2–4 are required to try live mode locally: open
 `calltime.html` (e.g. `python3 -m http.server` and visit it) once step 1 is
 done, and everything except outbound email will work.
 
-## 2. Email (Resend)
+## 2. Email (Gmail SMTP)
 
-1. Create an account at [resend.com](https://resend.com).
-2. Either verify your own sending domain, or use `onboarding@resend.dev`
-   for testing (Resend restricts that address to sending to your own
-   verified account email — fine for trying things out, not for real
-   students). `api/send-email.js` and `api/cron/tick.js` both default to
-   `onboarding@resend.dev`; swap in a verified-domain address once one's
-   approved for real students. Sending grade-related notices from your
-   institution's domain may need its own approval before you can verify
-   it in Resend — that's outside this app's scope, but worth starting
-   early since DNS/approval can take a while. The absence-warning/failing
-   templates intentionally point students to "consult your syllabus"
-   rather than including a computed grade number, to keep what's actually
-   transmitted minimal.
-3. Copy your API key.
+This app was originally speced to send through Resend (see
+`calltime-spec.md`), but that needs a verified sending domain before it'll
+deliver to anyone but your own Resend account email — not workable without
+a domain of your own. Instead, `api/_mailer.js` (shared by
+`api/send-email.js` and `api/cron/tick.js`) sends through Gmail SMTP via
+[nodemailer](https://nodemailer.com), reusing a personal or institutional
+Gmail account. The absence-warning/failing templates intentionally point
+students to "consult your syllabus" rather than including a computed grade
+number, to keep what's actually transmitted minimal.
+
+1. Turn on 2-Step Verification on the Gmail account you want to send from
+   (Google Account → **Security** → **2-Step Verification**) — required
+   before Google will issue app passwords.
+2. Google Account → **Security** → **App passwords** → create one (e.g.
+   "Call Time"). Copy the 16-character password shown — it's only
+   displayed once.
+3. Set `GMAIL_USER` (the full Gmail address) and `GMAIL_APP_PASSWORD` (that
+   16-character password, not your regular Gmail password) as Vercel
+   environment variables — see step 4 below. Gmail's sending limit is
+   ~500/day on a personal account, ~2000/day on Workspace — plenty for a
+   single ensemble program.
+4. If you're also routing Supabase's magic-link auth emails through Gmail
+   (see `supabase/README.md` §3), you can reuse the same app password
+   there — it's the same credential, just configured in two different
+   places (Supabase's dashboard vs. Vercel's env vars).
 
 The actual sending happens server-side in `api/send-email.js` — the
-browser never talks to Resend directly. That function requires a valid
+browser never talks to Gmail directly. That function requires a valid
 Supabase session token on every request (see the comment at the top of the
 file) so it can't be used as an open relay once deployed; it does *not*
 check that the caller is actually allowed to email the given recipient
@@ -53,8 +65,9 @@ service-role Supabase client before this handles real student data at
 scale.
 
 **What sends mail, and how:**
-- Rehearsal reminders, post-rehearsal notes, and excuse approved/denied
-  notices — user-triggered, via `api/send-email.js` (needs Resend only).
+- Rehearsal reminders, post-rehearsal notes, join-request notices, and
+  excuse approved/denied notices — user-triggered, via
+  `api/send-email.js` (needs Gmail SMTP only).
 - The "Absence notice" template — fires automatically the moment a teacher
   marks a student absent, same path as above.
 - "Absence warning" / "Failing risk" (`after_absence`) and pre-event
@@ -101,7 +114,7 @@ enabled in Settings without ever firing.
 
 ```bash
 npm install -g vercel
-npm install          # installs resend + @supabase/supabase-js for api/
+npm install          # installs nodemailer + @supabase/supabase-js for api/
 vercel login
 vercel --prod
 ```
@@ -113,9 +126,14 @@ Settings → Environment Variables) before your first deploy:
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...   # only needed for api/cron/tick.js — see step 3
-RESEND_API_KEY=re_...
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx   # 16-char app password, see step 2
 CRON_SECRET=any-random-string      # only needed for api/cron/tick.js — see step 3
 ```
+
+Vercel only picks up new/changed environment variables on the *next*
+deploy — if you add these after your first `vercel --prod`, redeploy (or
+push a commit) for them to take effect.
 
 `vercel.json` rewrites `/` to `calltime.html` so you don't need to rename
 the file to `index.html`. After deploying, add the deployed URL to
