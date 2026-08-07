@@ -4904,13 +4904,18 @@ function renderStudentLanding(skipAutoEnter) {
     }
   }
 
-  // Show ALL ensembles in join section so student can see what's available
+  // Show ALL ensembles in join section so student can see what's available —
+  // except ones this account already teaches (myRole==='teacher'). Those
+  // already have an ensemble_members row for this user, so offering a
+  // student "Request to join" button for them would hit the DB's
+  // (ensemble_id, user_id) unique constraint the moment it's clicked.
   const elJoin = document.getElementById('join-request-cards');
   if(elJoin) {
-    if(ensembles.length === 0) {
+    const joinable = ensembles.filter(e => e.myRole !== 'teacher');
+    if(joinable.length === 0) {
       elJoin.innerHTML = '<div style="font-size:13px;color:var(--t3);padding:8px 0">No ensembles available yet.</div>';
     } else {
-      elJoin.innerHTML = ensembles.map(e => {
+      elJoin.innerHTML = joinable.map(e => {
         const i = ensembles.indexOf(e);
         const isEnrolled = enrolled.includes(e);
         const req = (e.joinRequests||[]).find(r => r.email === currentStudent.email);
@@ -4939,6 +4944,7 @@ function renderStudentLanding(skipAutoEnter) {
 
 async function requestJoin(ensIdx) {
   const e = ensembles[ensIdx];
+  if (e.myRole) { showToast('You already have access to ' + e.name + '.'); return; }
   if (dataMode === 'live') {
     const { error } = await sb.from('ensemble_members').insert({
       ensemble_id: e.id, user_id: authSession.user.id,
