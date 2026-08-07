@@ -191,12 +191,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div id="topbar-brand" class="brand" style="font-size:15px"><i class="ti ti-masks-theater"></i>Call Time</div>
   </div>
-  <div class="rtog" id="role-toggle" style="display:none">
-    <button class="rbtn" onclick="switchRole('student',this)">Student</button>
-    <button class="rbtn on" onclick="switchRole('teacher',this)">Teacher</button>
-  <button id="signout-btn" style="display:none;background:none;border:none;color:var(--t2);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:var(--rs)" onclick="signOut()" title="Sign out">
-    <i class="ti ti-logout" style="font-size:16px;vertical-align:-2px"></i>
-  </button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="rtog" id="role-toggle" style="display:none">
+      <button class="rbtn" onclick="switchRole('student',this)">Student</button>
+      <button class="rbtn on" onclick="switchRole('teacher',this)">Teacher</button>
+    </div>
+    <!-- Deliberately a sibling of #role-toggle, not nested inside it — that
+         toggle is hidden while in the student view (enterEnsembleAsStudent()),
+         and a hidden parent hides its children regardless of their own
+         display style, which was silently taking sign-out down with it. -->
+    <button id="signout-btn" style="display:none;background:none;border:none;color:var(--t2);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:var(--rs)" onclick="signOut()" title="Sign out">
+      <i class="ti ti-logout" style="font-size:16px;vertical-align:-2px"></i>
+    </button>
   </div>
 </div>
 
@@ -236,15 +242,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
 
       <div style="margin-bottom:12px">
-        <label style="font-size:12px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Email address</label>
-        <input type="email" id="login-email" placeholder="you@william.jewell.edu"
+        <label style="font-size:12px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Full name</label>
+        <input type="text" id="login-name" placeholder="Jordan Martinez"
           style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:14px;outline:none;transition:border .15s"
           onfocus="this.style.borderColor='rgba(175,169,236,.8)'"
           onblur="this.style.borderColor='rgba(255,255,255,.15)'"
           onkeydown="if(event.key==='Enter')sendMagicLink()"/>
       </div>
 
-      <button onclick="sendMagicLink()" style="width:100%;padding:12px;background:#534AB7;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px"
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Email address</label>
+        <input type="email" id="login-email" placeholder="you@william.jewell.edu"
+          style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:14px;outline:none;transition:border .15s"
+          onfocus="this.style.borderColor='rgba(175,169,236,.8)'"
+          onblur="this.style.borderColor='rgba(255,255,255,.15)'"
+          onkeydown="if(event.key==='Enter')sendMagicLink()"/>
+        <div id="login-error" style="display:none;font-size:12px;color:#F4A6A5;margin-top:6px"></div>
+      </div>
+
+      <button id="send-magic-link-btn" onclick="sendMagicLink()" style="width:100%;padding:12px;background:#534AB7;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px"
         onmouseover="this.style.background='#3C3489'" onmouseout="this.style.background='#534AB7'">
         <i class="ti ti-send"></i>Send sign-in link
       </button>
@@ -292,7 +308,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
 
     <!-- Role toggle on landing -->
-    <div style="display:flex;background:var(--s2);border-radius:var(--rs);padding:3px;gap:3px;margin-bottom:1.5rem">
+    <div id="landing-role-toggle" style="display:flex;background:var(--s2);border-radius:var(--rs);padding:3px;gap:3px;margin-bottom:1.5rem">
       <button class="rbtn on" id="land-teacher-btn" onclick="setLandingRole('teacher',this)" style="flex:1;justify-content:center">Teacher</button>
       <button class="rbtn" id="land-student-btn" onclick="setLandingRole('student',this)" style="flex:1;justify-content:center">Student</button>
     </div>
@@ -303,16 +319,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn" style="width:100%;justify-content:center;padding:12px" onclick="openM('new-ensemble')">
         <i class="ti ti-plus"></i>Create new ensemble
       </button>
+      <div id="archived-ensembles" style="display:flex;flex-direction:column;gap:10px;margin-top:1.5rem"></div>
     </div>
 
-    <!-- STUDENT: enrolled ensembles + join requests -->
+    <!-- STUDENT: enrolled ensembles -->
     <div id="landing-student" style="display:none">
       <div id="student-ensemble-cards" style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.25rem"></div>
-
-      <div style="margin-top:1.5rem">
-        <div class="slbl">Join an ensemble</div>
-        <div id="join-request-cards" style="display:flex;flex-direction:column;gap:8px"></div>
-      </div>
     </div>
 
   </div>
@@ -381,9 +393,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
     <!-- METRICS -->
     <div class="metrics" style="margin-bottom:14px">
-      <div class="metric"><div class="mlbl">Present</div><div class="mval">9</div><div class="msub">of 14 students</div></div>
-      <div class="metric"><div class="mlbl">Late</div><div class="mval" style="color:var(--am)">2</div><div class="msub">after 7:00 pm</div></div>
-      <div class="metric"><div class="mlbl">Absent</div><div class="mval" style="color:var(--rd)">3</div><div class="msub">emails sent 7:01 pm</div></div>
+      <div class="metric"><div class="mlbl">Present</div><div class="mval" id="today-present-ct">9</div><div class="msub" id="today-present-sub">of 14 students</div></div>
+      <div class="metric"><div class="mlbl">Late</div><div class="mval" style="color:var(--am)" id="today-late-ct">2</div><div class="msub" id="today-late-sub">after 7:00 pm</div></div>
+      <div class="metric"><div class="mlbl">Absent</div><div class="mval" style="color:var(--rd)" id="today-absent-ct">3</div><div class="msub" id="today-absent-sub">emails sent 7:01 pm</div></div>
       <div class="metric"><div class="mlbl">Auto-checkout</div><div class="mval" style="font-size:20px">9:30<span style="font-size:13px;font-weight:400"> pm</span></div><div class="msub">in 1h 52m</div></div>
     </div>
 
@@ -426,7 +438,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <!-- ATTENDANCE -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="slbl" style="margin:0">Attendance</div>
-      <div class="gpill"><div class="gdot"></div>Geo-fence active · 50m</div>
+      <div class="gpill" id="today-geo-pill"><div class="gdot"></div>Geo-fence active · 50m</div>
     </div>
     <div class="card" style="margin-bottom:14px" id="today-list"></div>
 
@@ -477,15 +489,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="rbw">
       <div class="slbl" style="margin:0">Cast &amp; crew — <span id="roster-count">14</span> members</div>
       <div style="display:flex;gap:8px">
+        <button class="btn" onclick="copyInviteLink()"><i class="ti ti-link"></i>Copy invite link</button>
         <button class="btn" onclick="openM('import')"><i class="ti ti-table-import"></i>Import roster</button>
         <button class="btn btnp" onclick="openM('student')"><i class="ti ti-user-plus"></i>Add student</button>
       </div>
-    </div>
-
-    <!-- Pending join requests -->
-    <div id="join-requests-section" style="display:none;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--am);margin-bottom:8px"><span class="pdot"></span>Join requests pending</div>
-      <div id="join-requests-list"></div>
     </div>
 
     <div class="card">
@@ -593,6 +600,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="stab" onclick="switchStab('notifications',this)">Notifications</button>
       <button class="stab" onclick="switchStab('templates',this)">Email templates</button>
       <button class="stab" onclick="switchStab('checkin',this)">Check-in rules</button>
+      <button class="stab" onclick="switchStab('general',this)">General</button>
     </div>
 
     <!-- GRADING -->
@@ -602,7 +610,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="card" style="margin-bottom:14px">
         <div class="ctitle">Grading model</div>
         <div class="csub">Choose how absences affect the final grade for this ensemble.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="grade-model-btns">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="grade-model-btns">
           <div class="grade-model-card on" id="gm-pct" onclick="selectGradeModel('pct')">
             <div style="font-size:15px;margin-bottom:4px">📉</div>
             <div style="font-size:13px;font-weight:600">Percentage deduction</div>
@@ -613,11 +621,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <div style="font-size:13px;font-weight:600">Letter grade drop</div>
             <div style="font-size:11px;color:var(--t2);margin-top:3px">e.g. drop a half or full letter after N absences</div>
           </div>
+          <div class="grade-model-card" id="gm-points" onclick="selectGradeModel('points')">
+            <div style="font-size:15px;margin-bottom:4px">🎯</div>
+            <div style="font-size:13px;font-weight:600">Points pool</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:3px">e.g. 1000 points total, ±5 per rehearsal</div>
+          </div>
         </div>
       </div>
 
-      <!-- SHARED: Absence limits -->
-      <div class="card" style="margin-bottom:14px">
+      <!-- SHARED: Absence limits (pct/letter only — the points pool doesn't use a free-absence grace period, the pool size itself is the cushion) -->
+      <div class="card" style="margin-bottom:14px" id="grading-limits-card">
         <div class="ctitle">Absence limits</div>
         <div class="csub">Free absences before penalty, and the threshold for failing risk.</div>
         <div style="display:flex;gap:14px">
@@ -677,6 +690,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
       </div>
 
+      <!-- POINTS MODEL -->
+      <div id="grading-points-section" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div class="ctitle">Points pool</div>
+          <div class="csub">Total points a student can have, and what one rehearsal is worth.</div>
+          <div style="display:flex;gap:14px;margin-bottom:14px">
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Total points</label>
+              <input type="number" min="1" value="1000" id="r-points-total" oninput="updPoints()"
+                style="width:100%;padding:8px 10px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:14px"/>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Points per rehearsal</label>
+              <input type="number" min="1" value="5" id="r-points-per-event" oninput="updPoints()"
+                style="width:100%;padding:8px 10px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:14px"/>
+            </div>
+          </div>
+          <div style="font-size:13px;color:var(--t2);margin-bottom:8px">A student's grade is their point balance:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" id="points-mode-chips">
+            <button class="chip on" data-v="deduct" onclick="selChip(this,'points-mode-chips');updPoints()">Deducted from the pool per absence</button>
+            <button class="chip" data-v="earn" onclick="selChip(this,'points-mode-chips');updPoints()">Earned toward the pool per rehearsal attended</button>
+          </div>
+          <div id="points-prev" style="background:var(--s2);border-radius:var(--rs);padding:10px 12px;font-size:13px;color:var(--t2);line-height:1.6"></div>
+        </div>
+      </div>
+
       <!-- SHARED: Tardy + excuse window -->
       <div class="card" style="margin-bottom:14px">
         <div class="ctitle">Tardy policy</div>
@@ -706,8 +745,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:14px">
+        <div class="ctitle">Excused absences</div>
+        <div class="csub">When a student's excuse is approved, should that absence still count toward the free-absence/failing thresholds and grade deduction above?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="excused-chips">
+          <button class="chip on" data-v="exclude" onclick="selChip(this,'excused-chips');pol.excludeExcused=true;renderRoster();">Don't count toward grade</button>
+          <button class="chip" data-v="include" onclick="selChip(this,'excused-chips');pol.excludeExcused=false;renderRoster();">Count same as unexcused</button>
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px">
-        <button class="btn btnp" onclick="saveAll('cfm-grading')"><i class="ti ti-device-floppy"></i>Save</button>
+        <button class="btn btnp" onclick="saveGradingPolicy('cfm-grading')"><i class="ti ti-device-floppy"></i>Save</button>
         <button class="btn" onclick="resetGrading()"><i class="ti ti-refresh"></i>Reset defaults</button>
       </div>
       <div class="cfm" id="cfm-grading"><i class="ti ti-circle-check" style="vertical-align:-2px"></i> Saved — roster updated.</div>
@@ -831,6 +879,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
       <div class="cfm" id="cfm-checkin"><i class="ti ti-circle-check" style="vertical-align:-2px"></i> Check-in rules saved.</div>
     </div>
+
+    <!-- GENERAL -->
+    <div class="spane" id="s-general">
+      <div class="card">
+        <div class="ctitle">Invite students</div>
+        <div class="csub">Share this ensemble's invite link — anyone who opens it and signs in is added as a student automatically, no approval needed.</div>
+        <button class="btn" onclick="copyInviteLink()"><i class="ti ti-link"></i>Copy invite link</button>
+      </div>
+
+      <div class="card" style="border-color:var(--rd)">
+        <div class="ctitle" style="color:var(--rd)">Danger zone</div>
+        <div class="csub">Archiving hides this ensemble from your list without deleting anything — bring it back anytime. Deleting is permanent and removes all its events, attendance, and roster data.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="archive-ens-btn" onclick="toggleArchiveEnsemble()"><i class="ti ti-archive"></i>Archive ensemble</button>
+          <button class="btn" style="color:var(--rd)" onclick="deleteEnsemble()"><i class="ti ti-trash"></i>Delete ensemble</button>
+        </div>
+      </div>
+    </div>
   </div><!-- /settings -->
 </div><!-- /teacher -->
 
@@ -840,10 +906,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <!-- STUDENT TOPBAR -->
   <div style="background:var(--sf);border-bottom:.5px solid var(--bd);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:56px;z-index:10">
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="avatar" style="width:32px;height:32px;font-size:11px">JM</div>
+      <div class="avatar" style="width:32px;height:32px;font-size:11px" id="stu-avatar">JM</div>
       <div>
-        <div style="font-size:14px;font-weight:600;line-height:1.2">Jordan Martinez</div>
-        <div style="font-size:11px;color:var(--t2)">Lead · Into the Woods</div>
+        <div style="font-size:14px;font-weight:600;line-height:1.2;display:flex;align-items:center;gap:6px">
+          <span id="stu-name-display">Jordan Martinez</span>
+          <i class="ti ti-pencil" style="font-size:13px;color:var(--t3);cursor:pointer" onclick="openEditName()" title="Edit your name"></i>
+        </div>
+        <div style="font-size:11px;color:var(--t2)" id="stu-role-line">Lead · Into the Woods</div>
       </div>
     </div>
     <span class="badge ba" id="stu-badge">2 absences</span>
@@ -868,29 +937,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px">
           <div>
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--pu);margin-bottom:3px">Tonight</div>
-            <div style="font-size:17px;font-weight:700">Main Stage Rehearsal</div>
+            <div style="font-size:17px;font-weight:700" id="stu-today-name">Main Stage Rehearsal</div>
           </div>
           <span class="badge bg" style="margin-top:4px">Tonight</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Call time</div>
-            <div style="font-size:13px;font-weight:600">6:30 pm</div>
+            <div style="font-size:13px;font-weight:600" id="stu-today-call">6:30 pm</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Rehearsal</div>
-            <div style="font-size:13px;font-weight:600">7:00 – 9:30 pm</div>
+            <div style="font-size:13px;font-weight:600" id="stu-today-time">7:00 – 9:30 pm</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Venue</div>
-            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Yardley Hall</div>
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stu-today-venue">Yardley Hall</div>
           </div>
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
             <div style="font-size:10px;color:var(--t3);margin-bottom:1px">Attire</div>
-            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rehearsal blacks</div>
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stu-today-dress">Rehearsal blacks</div>
           </div>
         </div>
-        <div class="gpill" style="margin-bottom:14px"><div class="gdot"></div>You're within the rehearsal zone</div>
+        <div class="gpill" style="margin-bottom:14px" id="stu-geo-pill"><div class="gdot"></div>You're within the rehearsal zone</div>
 
         <!-- CHECK-IN RING -->
         <div style="text-align:center;padding:1rem 0">
@@ -903,9 +972,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
 
       <!-- TONIGHT PROGRAM -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" style="margin-bottom:14px" id="stu-today-program-section">
         <div style="font-size:13px;font-weight:600;margin-bottom:10px">Tonight's program</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:6px" id="stu-today-program">
           <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid var(--bd)">
             <i class="ti ti-music" style="color:var(--pu);font-size:14px;flex-shrink:0"></i>
             <div><div style="font-size:13px;font-weight:500">Lux Aeterna</div><div style="font-size:11px;color:var(--t3)">Morten Lauridsen</div></div>
@@ -948,7 +1017,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <div style="font-size:14px;font-weight:600;color:var(--rd)">Missed rehearsal — May 5</div>
         </div>
         <div style="font-size:13px;color:var(--t2);margin-bottom:12px">You have 48 hours to submit an excuse or this will count as unexcused.</div>
-        <button class="btn btnp" style="width:100%;justify-content:center" onclick="openM('exc-sub')"><i class="ti ti-file-text"></i>Submit excuse</button>
+        <button class="btn btnp" style="width:100%;justify-content:center" onclick="openExcuseSubmit()"><i class="ti ti-file-text"></i>Submit excuse</button>
       </div>
 
     </div>
@@ -992,7 +1061,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stupane" id="stu-excuses">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div class="slbl" style="margin:0">My excuses</div>
-        <button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openM('exc-sub')"><i class="ti ti-plus"></i>Submit excuse</button>
+        <button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openExcuseSubmit()"><i class="ti ti-plus"></i>Submit excuse</button>
       </div>
       <div id="stu-excuses-list"></div>
     </div>
@@ -1049,8 +1118,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="field">
       <label>Geo-fence radius</label>
       <div style="display:flex;align-items:center;gap:10px">
-        <input type="range" min="10" max="200" value="50" step="5" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('gr-v').textContent=this.value+'m'"/>
+        <input type="range" min="10" max="200" value="50" step="5" id="ev-geo-radius" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('gr-v').textContent=this.value+'m'"/>
         <span id="gr-v" style="font-size:13px;color:var(--t2);min-width:42px">50m</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="captureEventGeo('ev')"><i class="ti ti-map-pin"></i>Set to my current location</button>
+        <span id="ev-geo-status" style="font-size:12px;color:var(--t3)">No location set — check-in won't be location-restricted</span>
       </div>
     </div>
 
@@ -1148,6 +1221,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="field"><label>Dress / attire</label><input type="text" id="ce-dress"/></div>
     </div>
     <div class="field">
+      <label>Geo-fence radius</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="range" min="10" max="200" value="50" step="5" id="ce-geo-radius" style="flex:1;accent-color:var(--pu)" oninput="document.getElementById('ce-gr-v').textContent=this.value+'m'"/>
+        <span id="ce-gr-v" style="font-size:13px;color:var(--t2);min-width:42px">50m</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <button type="button" class="btn" style="font-size:12px;padding:5px 10px" onclick="captureEventGeo('ce')"><i class="ti ti-map-pin"></i>Update to my current location</button>
+        <span id="ce-geo-status" style="font-size:12px;color:var(--t3)">No location set — check-in won't be location-restricted</span>
+      </div>
+    </div>
+    <div class="field">
       <label>Program (one piece per line — Title, Composer)</label>
       <textarea id="ce-program" style="min-height:90px;resize:vertical;font-size:13px;line-height:1.6"></textarea>
     </div>
@@ -1241,6 +1325,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- MODAL: Edit your name (student self-service — fixes a name that got
+     auto-derived from an email address at invite-link join time) -->
+<div class="mbg" id="m-edit-name" onclick="closeMBG('edit-name',event)">
+  <div class="mbox">
+    <div class="mtitle"><i class="ti ti-user-edit"></i>Your name</div>
+    <div class="field"><label>Full name</label><input type="text" id="edit-name-input" placeholder="First Last"/></div>
+    <div class="mact">
+      <button class="btn" onclick="closeM('edit-name')">Cancel</button>
+      <button class="btn btnp" onclick="saveEditName()"><i class="ti ti-check"></i>Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Edit student (teacher-side — fixes a name/email/role without
+     waiting on the student to do it themselves via the pencil in their
+     own topbar; see openEditStudent()/saveEditStudent()) -->
+<div class="mbg" id="m-edit-student" onclick="closeMBG('edit-student',event)">
+  <div class="mbox">
+    <div class="mtitle"><i class="ti ti-user-edit"></i>Edit student</div>
+    <input type="hidden" id="edit-s-id"/>
+    <div class="field"><label>Full name</label><input type="text" id="edit-s-name" placeholder="First Last"/></div>
+    <div class="field"><label>Email</label><input type="email" id="edit-s-email" placeholder="student@school.edu"/></div>
+    <div class="field"><label>Role / part</label><input type="text" id="edit-s-role" placeholder="e.g. Lead, Ensemble, Stage crew"/></div>
+    <div class="mact" style="justify-content:space-between">
+      <button class="btn" style="color:var(--rd)" onclick="removeStudent()"><i class="ti ti-user-x"></i>Remove from roster</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeM('edit-student')">Cancel</button>
+        <button class="btn btnp" onclick="saveEditStudent()"><i class="ti ti-check"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Import roster -->
 <div class="mbg" id="m-import" onclick="closeMBG('import',event)">
   <div class="mbox" style="width:520px">
@@ -1310,7 +1427,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="mtitle"><i class="ti ti-file-text"></i>Submit an excuse</div>
     <div style="background:var(--s2);border-radius:var(--rs);padding:10px 12px;margin-bottom:14px">
       <div style="font-size:12px;color:var(--t2)">Absence for</div>
-      <div style="font-size:14px;font-weight:600">Act 1 Run-through · May 5</div>
+      <div style="font-size:14px;font-weight:600" id="exc-sub-event-hdr">Act 1 Run-through · May 5</div>
     </div>
     <div class="field"><label>Type of absence</label>
       <select id="exc-type">
@@ -1707,6 +1824,15 @@ O Magnum Mysterium, Morten Lauridsen</textarea>
           <button class="chip" data-v="5" onclick="selChip(this,'wiz-tardy-btns')">5 tardies</button>
         </div>
       </div>
+
+      <div class="card">
+        <div class="ctitle">Excused absences</div>
+        <div class="csub">When a student's excuse is approved, should that absence still count toward the free-absence/failing thresholds and grade deduction above?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" id="wiz-excused-btns">
+          <button class="chip on" data-v="exclude" onclick="selChip(this,'wiz-excused-btns')">Don't count toward grade</button>
+          <button class="chip" data-v="include" onclick="selChip(this,'wiz-excused-btns')">Count same as unexcused</button>
+        </div>
+      </div>
     </div>
 
     <!-- STEP 3: Syllabus -->
@@ -1795,7 +1921,144 @@ O Magnum Mysterium, Morten Lauridsen</textarea>
   <img id="lbox-img" src="" alt="attachment"/>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/* ═══════════════════════════════════════════
+   SUPABASE CLIENT + AUTH
+   See supabase/README.md for setup steps.
+═══════════════════════════════════════════ */
+const SUPABASE_URL = 'https://qjyvgskhfokrdzwpejlh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YHXUpLTm7rFDU3yD1qnkYw_B5viCBor';
+
+// createClient() throws synchronously on a non-URL string, which would abort
+// this whole inline script (including every render function below it) before
+// it finishes running. Guard it so an unconfigured or CDN-blocked page still
+// falls back to demo mode instead of a blank screen.
+const SUPABASE_CONFIGURED = SUPABASE_URL !== 'YOUR_SUPABASE_URL'
+  && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY'
+  && typeof window.supabase !== 'undefined';
+const sb = SUPABASE_CONFIGURED ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+if (!SUPABASE_CONFIGURED) {
+  console.warn('Supabase is not configured (see supabase/README.md) — magic-link sign-in is disabled; use "Skip for now (demo mode)" to explore the UI.');
+}
+
+let authSession = null; // the current Supabase auth session, kept in sync by onAuthStateChange
+
+if (sb) {
+  sb.auth.onAuthStateChange(async (event, newSession) => {
+    authSession = newSession;
+    if (newSession && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Magic-link redirects land back here with #access_token=... in the URL — drop it once consumed.
+      if (window.location.hash.includes('access_token')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      currentStudent.email = newSession.user.email || currentStudent.email;
+      currentStudent.name = newSession.user.user_metadata?.name || nameFromEmail(currentStudent.email);
+      currentStudent.initials = initialsFromName(currentStudent.name);
+      dataMode = 'live';
+      // The "I am a Teacher/Student" choice on the login screen only lives in
+      // the `loginRole` variable, which resets to its default on the fresh
+      // page load the magic-link email redirects back to — so without this,
+      // enterApp() below would always land a student pick back on Teacher.
+      // sendMagicLink() stashes the choice in localStorage right before
+      // sending, since that's the one thing that survives the round trip.
+      const savedRole = localStorage.getItem('ct_login_role');
+      if (savedRole) { loginRole = savedRole; localStorage.removeItem('ct_login_role'); }
+      // An invite link always means joining as a student, regardless of
+      // whatever the login screen's Teacher/Student picker happened to
+      // default to (or what a stale ct_login_role says).
+      if (new URLSearchParams(window.location.search).has('join')) loginRole = 'student';
+      await loadEnsemblesFromDB();
+      enterApp();
+      await handleJoinDeepLink(); // no-op unless the URL has ?join=<ensembleId> (see copyInviteLink())
+      await handleCheckinDeepLink(); // no-op unless the URL has ?checkin=<eventId>&ensemble=<ensembleId> (see genQR())
+    } else if (event === 'SIGNED_OUT') {
+      resetToLogin();
+    }
+  });
+}
+
+// Calls the /api/send-email Vercel function (see api/send-email.js), passing
+// the signed-in user's Supabase access token so the endpoint can verify the
+// caller before relaying through Resend. Returns true/false, never throws —
+// callers loop over recipients and count failures rather than aborting on
+// the first one.
+async function sendEmail(to, subject, body, from) {
+  if (!authSession) { showToast('Not signed in.'); return false; }
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authSession.access_token },
+      body: JSON.stringify({ to, subject, body, from }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { console.error('send-email failed', json); return false; }
+    return true;
+  } catch (err) {
+    console.error('send-email failed', err);
+    return false;
+  }
+}
+
+async function sendMagicLink() {
+  const nameInput = document.getElementById('login-name');
+  const emailInput = document.getElementById('login-email');
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('send-magic-link-btn');
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  errEl.style.display = 'none';
+  if(!name) {
+    nameInput.style.borderColor = 'rgba(226,75,74,.8)';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = 'rgba(255,255,255,.15)';
+  if(!email || !email.includes('@')) {
+    emailInput.style.borderColor = 'rgba(226,75,74,.8)';
+    emailInput.focus();
+    return;
+  }
+  emailInput.style.borderColor = 'rgba(255,255,255,.15)';
+  if (!sb) {
+    errEl.textContent = 'Supabase isn\'t configured yet — see supabase/README.md, or use "Skip for now (demo mode)" below.';
+    errEl.style.display = 'block';
+    return;
+  }
+  btn.disabled = true;
+  btn.style.opacity = '.6';
+  localStorage.setItem('ct_login_role', loginRole); // read back in onAuthStateChange after the redirect
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
+    // from a QR scan — see genQR()/handleCheckinDeepLink()) so it survives
+    // the magic-link round trip instead of being dropped here before the
+    // email even goes out. `data.name` becomes user_metadata.name, read
+    // back in onAuthStateChange — otherwise a student's name on the roster
+    // ends up auto-derived from their email (see nameFromEmail()) since
+    // magic-link sign-in collects nothing else about who they are.
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname + window.location.search,
+      data: { name },
+    }
+  });
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('login-email-confirm').textContent = email;
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('check-email-card').style.display = 'block';
+}
+
+async function signOut() {
+  if (sb) await sb.auth.signOut();
+  resetToLogin();
+}
+
 /* DATA */
 const students=[
   {n:'Jordan Martinez',i:'JM',r:'Lead',e:'jmartinez@william.jewell.edu',s:'present',t:'6:58 pm',a:2},
@@ -1847,8 +2110,9 @@ const tlData=[
   {l:'Act 1 Run-through',d:'May 5',s:'absent',ex:'pending'},
   {l:'Main Stage Rehearsal',d:'May 2',s:'present',ex:null},
 ];
-let curExcId=null,upImgSrc='';
-let pol={free:2,fail:4,ded:5,tardy:3};
+let curExcId=null,upImgSrc='',upFile=null;
+let pol={free:2,fail:4,ded:5,tardy:3,excludeExcused:true};
+let pointsTotal=1000, pointsPerEvent=5, pointsMode='deduct'; // gradeModel==='points'
 
 /* BADGES */
 function bdg(s){
@@ -1868,10 +2132,17 @@ function flash(id){const el=document.getElementById(id);if(!el)return;el.style.d
 
 /* RENDER */
 function renderAll(){
-  document.getElementById('today-list').innerHTML=students.map(s=>`
-    <div class="srow"><div class="avatar">${s.i}</div>
+  document.getElementById('today-list').innerHTML=students.map(s=>{
+    // Live mode: click a row to cycle its attendance status (present -> late
+    // -> absent). Members who've never signed in have no user_id yet, so
+    // there's nothing to key an attendance row on — show them read-only.
+    const live = dataMode === 'live';
+    const rowAttrs = live && s.userId ? ` onclick="cycleAttendance('${s.userId}')" style="cursor:pointer"` : '';
+    const statusHtml = live && !s.userId ? '<span style="font-size:11px;color:var(--t3)">Not signed up</span>' : bdg(s.s);
+    return `<div class="srow"${rowAttrs}><div class="avatar">${s.i}</div>
     <div style="flex:1"><div class="sname">${s.n}</div><div class="smeta">${s.r}</div></div>
-    <div style="text-align:right">${bdg(s.s)}<div style="font-size:11px;color:var(--t3);margin-top:2px">${s.t}</div></div></div>`).join('');
+    <div style="text-align:right">${statusHtml}<div style="font-size:11px;color:var(--t3);margin-top:2px">${s.t}</div></div></div>`;
+  }).join('');
   renderCal();
   renderRoster();renderExcuses();renderLog();
   const stuTlEl = document.getElementById('stu-tl'); if(stuTlEl) stuTlEl.innerHTML=tlData.map(t=>`<div class="tli"><div class="tldot ${t.s==='absent'?'ab':t.s==='late'?'la':''}"></div><div class="tldate">${t.d}</div><div class="tllbl">${t.l} ${bdg(t.s)}${t.ex?'&nbsp;'+excBdg(t.ex):''}</div></div>`).join('');
@@ -1879,18 +2150,39 @@ function renderAll(){
 
 function renderRoster(){
   document.getElementById('roster-list').innerHTML=students.map(s=>{
-    const pct=Math.min(Math.round((s.a/pol.fail)*100),100);
-    const fill=s.a>=pol.fail?'#E24B4A':s.a>pol.free?'#EF9F27':'#63A322';
-    const over=Math.max(0,s.a-pol.free);const lost=over*pol.ded;
-    const g=s.a>=pol.fail?bdg('absent'):s.a>pol.free?bdg('late'):bdg('present');
-    const gn=lost>0?`<div style="font-size:11px;color:var(--am);margin-top:2px">−${lost}% grade</div>`:'';
-    return`<div class="trow">
-      <div style="display:flex;align-items:center;gap:8px">
+    const editBtn = s.memberId
+      ? `<i class="ti ti-pencil" style="font-size:13px;color:var(--t3);cursor:pointer;margin-left:6px" onclick="event.stopPropagation();openEditStudent('${s.memberId}')" title="Edit student"></i>`
+      : '';
+    const head = `<div style="display:flex;align-items:center;gap:8px">
         <div class="avatar">${s.i}</div>
-        <div><div style="font-size:13px;font-weight:500">${s.n}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
+        <div><div style="font-size:13px;font-weight:500;display:flex;align-items:center">${s.n}${editBtn}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
       </div>
-      <div style="color:var(--t2)">${s.r}</div>
-      <div><strong>${s.a}</strong><span style="color:var(--t3)"> / ${pol.fail}</span>
+      <div style="color:var(--t2)">${s.r}</div>`;
+
+    if (gradeModel === 'points') {
+      const bal=pointsBalance(s);
+      const pct=Math.min(100,Math.round((bal/pointsTotal)*100));
+      const fill=pct<50?'#E24B4A':pct<80?'#EF9F27':'#63A322';
+      const g=pct<50?bdg('absent'):pct<80?bdg('late'):bdg('present');
+      // Excused count is only meaningful here in deduct mode (it's the
+      // count of absences the policy chose not to charge points for) —
+      // earn mode never touches it, since only actual attendance earns.
+      const excusedNote=(pointsMode==='deduct' && pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
+      return`<div class="trow">${head}
+      <div><strong>${bal}</strong><span style="color:var(--t3)"> / ${pointsTotal}</span>${excusedNote}
+        <div class="abar"><div class="afill" style="width:${pct}%;background:${fill}"></div></div></div>
+      <div>${g}</div></div>`;
+    }
+
+    const ga=gradedAbsences(s);
+    const pct=Math.min(Math.round((ga/pol.fail)*100),100);
+    const fill=ga>=pol.fail?'#E24B4A':ga>pol.free?'#EF9F27':'#63A322';
+    const score=Math.max(0,100-Math.max(0,ga-pol.free)*pol.ded);
+    const g=ga>=pol.fail?bdg('absent'):ga>pol.free?bdg('late'):bdg('present');
+    const gn=score<100?`<div style="font-size:11px;color:var(--am);margin-top:2px">${score} grade</div>`:'';
+    const excusedNote=(pol.excludeExcused && s.aExcused>0)?`<span style="color:var(--t3)"> (${s.aExcused} excused)</span>`:'';
+    return`<div class="trow">${head}
+      <div><strong>${s.a}</strong><span style="color:var(--t3)"> / ${pol.fail}</span>${excusedNote}
         <div class="abar"><div class="afill" style="width:${pct}%;background:${fill}"></div></div></div>
       <div>${g}${gn}</div></div>`;
   }).join('');
@@ -1993,8 +2285,34 @@ function switchStab(id,btn){
 }
 
 /* CHECK-IN */
-let ciIn=false;
-function toggleCI(){
+let ciIn=false; // demo-mode-only local toggle state
+async function toggleCI(){
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const checkedIn = document.getElementById('ciring').classList.contains('in');
+    if (!checkedIn) {
+      const fence = await checkGeoFence(ev);
+      if (!fence.ok) {
+        const proceed = confirm('You appear to be about ' + fence.distance + 'm from the rehearsal location. Check in anyway?');
+        if (!proceed) return;
+      }
+      const { error } = await sb.from('attendance').upsert({
+        event_id: ev.id, user_id: authSession.user.id, ensemble_id: activeEns().id,
+        status: 'present', checkin_at: new Date().toISOString(), checkout_at: null,
+      }, { onConflict: 'event_id,user_id' });
+      if (error) { showToast('Could not check in: ' + error.message); return; }
+    } else {
+      const { error } = await sb.from('attendance')
+        .update({ checkout_at: new Date().toISOString() })
+        .eq('event_id', ev.id).eq('user_id', authSession.user.id);
+      if (error) { showToast('Could not check out: ' + error.message); return; }
+    }
+    await syncCheckInRing(ev);
+    return;
+  }
+
+  // demo mode: unchanged, purely cosmetic — no data is written anywhere
   ciIn=!ciIn;
   const ring=document.getElementById('ciring'),icon=document.getElementById('ci-icon'),lbl=document.getElementById('ci-lbl'),tm=document.getElementById('ci-time'),badge=document.getElementById('stu-badge');
   if(ciIn){ring.classList.add('in');icon.className='ti ti-door-exit';lbl.textContent='Checked in — tap to check out';const t=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});tm.textContent='Checked in at '+t;badge.textContent='Checked in';badge.className='badge bg';}
@@ -2010,6 +2328,7 @@ function openM(id){
   if(id==='reminder')   { buildReminderEmail(); }
   if(id==='absreport')  { renderReportModal(); }
   if(id==='post-email') { buildPostEmail(); }
+  if(id==='today-edit' && dataMode==='live') { prefillTodayEdit(); }
 }
 function closeM(id){document.getElementById('m-'+id).classList.remove('open')}
 function closeMBG(id,e){if(e.target===document.getElementById('m-'+id))closeM(id)}
@@ -2018,6 +2337,73 @@ function closeLB(){document.getElementById('lbox').classList.remove('open')}
 
 /* EXCUSES */
 function filterExc(f){renderExcuses();}
+// Loads every excuse for the ensemble (teacher) or the signed-in student's
+// own (RLS enforces the latter automatically). excuses has no direct
+// event_id — only attendance_id — so the event name/date come through a
+// nested select via attendance -> events.
+async function loadExcusesFromDB(e) {
+  const { data, error } = await sb.from('excuses')
+    .select('*, attendance(event_id, events(name, event_date))')
+    .eq('ensemble_id', e.id).order('submitted_at', { ascending: false });
+  if (error) { console.error(error); showToast('Could not load excuses: ' + error.message); return; }
+  const memberByUser = {};
+  (e.students||[]).forEach(s => { if (s.userId) memberByUser[s.userId] = s; });
+  e.excuses = await Promise.all((data||[]).map(async row => {
+    const ev = row.attendance && row.attendance.events;
+    const member = memberByUser[row.user_id];
+    const isMe = row.user_id === authSession.user.id;
+    // attachment_url holds a Storage path (see submitExc()), not a public
+    // URL — the bucket is private, so resolve a short-lived signed URL to
+    // actually display it.
+    let src = '';
+    if (row.attachment_url) {
+      const { data: signed } = await sb.storage.from('excuse-attachments')
+        .createSignedUrl(row.attachment_url, 3600);
+      src = signed?.signedUrl || '';
+    }
+    return {
+      id: row.id,
+      stu: member ? member.n : (isMe ? currentStudent.name : 'Student'),
+      ini: member ? member.i : initialsFromName(isMe ? currentStudent.name : 'Student'),
+      ev: ev ? ev.name : '', dt: ev ? dispDateFromISO(ev.event_date) : '',
+      type: row.type || '', txt: row.text || '',
+      // Only render <img> for actual image attachments — matches the
+      // original prototype's behavior, where a PDF's upImgSrc stayed ''
+      // and the review card just showed "No attachment" for it too.
+      img: !!row.attachment_url && /\.(jpe?g|png|gif|webp|heic)$/i.test(row.attachment_url), src,
+      status: row.status || 'pending', note: row.teacher_note || '',
+      userId: row.user_id,
+    };
+  }));
+}
+
+// Finds the signed-in student's most recent absence with no excuse yet
+// filed against it, via a nested select through attendance -> events
+// (excuses has no direct event_id). Powers openExcuseSubmit() below since
+// the submit-excuse modal has no picker UI for "which absence is this for".
+async function findMyMostRecentAbsence() {
+  const { data, error } = await sb.from('attendance')
+    .select('id, event_id, events(name, event_date)')
+    .eq('user_id', authSession.user.id).eq('status', 'absent')
+    .order('event_date', { foreignTable: 'events', ascending: false })
+    .limit(1);
+  if (error || !data || !data.length || !data[0].events) return null;
+  return { attendanceId: data[0].id, eventName: data[0].events.name, eventDate: data[0].events.event_date };
+}
+
+let pendingExcuseTarget = null; // {attendanceId, eventName, eventDate} — set by openExcuseSubmit(), live mode only
+
+async function openExcuseSubmit() {
+  if (dataMode === 'live') {
+    const target = await findMyMostRecentAbsence();
+    if (!target) { showToast('No unresolved absences to submit an excuse for.'); return; }
+    pendingExcuseTarget = target;
+    const hdr = document.getElementById('exc-sub-event-hdr');
+    if (hdr) hdr.textContent = target.eventName + ' · ' + dispDateFromISO(target.eventDate);
+  }
+  openM('exc-sub');
+}
+
 function openRev(id){
   const ex=excuses.find(e=>e.id===id);if(!ex)return;curExcId=id;
   document.getElementById('rev-hdr').innerHTML=`<div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:28px;height:28px;font-size:10px">${ex.ini}</div><div><div style="font-size:13px;font-weight:600">${ex.stu}</div><div style="font-size:12px;color:var(--t2)">${ex.ev} · ${ex.dt} · <strong>${ex.type}</strong></div></div></div>`;
@@ -2026,35 +2412,90 @@ function openRev(id){
   if(ex.img){att.style.display='block';document.getElementById('rev-img').src=ex.src}else{att.style.display='none'}
   document.getElementById('rev-note').value=ex.note||'';openM('exc-rev');
 }
-function decideExc(d){
+async function decideExc(d){
   const ex=excuses.find(e=>e.id===curExcId);if(!ex)return;
-  ex.status=d;ex.note=document.getElementById('rev-note').value;
+  const note = document.getElementById('rev-note').value;
+
+  if (dataMode === 'live') {
+    const { error } = await sb.from('excuses')
+      .update({ status: d, teacher_note: note, reviewed_at: new Date().toISOString() })
+      .eq('id', curExcId);
+    if (error) { showToast('Could not save decision: ' + error.message); return; }
+    const e = activeEns();
+    // Reload the roster too, not just excuses — approving/denying changes
+    // the approved-excuse count loadRosterFromDB() feeds into aExcused,
+    // which gradedAbsences()/renderRoster() depend on.
+    await Promise.all([loadExcusesFromDB(e), loadRosterFromDB(e)]);
+    loadEnsembleContext();
+
+    // Fire-and-forget the approved/denied notice, using the excuse's own
+    // event (not necessarily today's) for the {{event_name}}/{{event_date}}
+    // tokens — a minimal shim since ex only carries display strings, not a
+    // full mapped event.
+    const member = students.find(s => s.userId === ex.userId);
+    const tpl = tpls[d === 'approved' ? 'exc_app' : 'exc_den'];
+    if (member && member.e && tpl) {
+      const evShim = { n: ex.ev, d: ex.dt, dateObj: null };
+      sendEmail(member.e, renderTemplateTokens(tpl.s, member, evShim), renderTemplateTokens(tpl.b, member, evShim));
+    }
+  } else {
+    ex.status=d;ex.note=note;
+  }
+
   closeM('exc-rev');renderExcuses();renderLog();
   // Also refresh student excuses tab if it's open
   const stuExcPane = document.getElementById('stu-excuses');
   if(stuExcPane && stuExcPane.classList.contains('show')) renderStuExcuses();
-  // Update student badge
-  const myExcuses = excuses.filter(e=>e.stu==='Jordan Martinez');
-  const unexcused = myExcuses.filter(e=>e.status==='denied').length;
-  const pending = myExcuses.filter(e=>e.status==='pending').length;
-  const badge = document.getElementById('stu-badge');
-  if(badge) {
-    const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
-    badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+
+  if (dataMode !== 'live') {
+    // Update student badge (demo mode only — live mode has no equivalent
+    // absence-count recompute here; see decideExc's known gap in the PR notes)
+    const badge = document.getElementById('stu-badge');
+    if(badge) {
+      const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
+      badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+    }
   }
 }
 function handleUp(inp){
   const file=inp.files[0];if(!file)return;
+  upFile=file; // live mode uploads this to Storage in submitExc(); upImgSrc below is local preview only
   const zone=document.getElementById('upzone'),icon=document.getElementById('up-icon'),lbl=document.getElementById('up-lbl');
   zone.classList.add('ok');icon.className='ti ti-circle-check';lbl.textContent=file.name;
   if(file.type.startsWith('image/')){const r=new FileReader();r.onload=e=>{upImgSrc=e.target.result;document.getElementById('up-img').src=upImgSrc;document.getElementById('uprev').style.display='block';document.getElementById('pdf-nm').style.display='none'};r.readAsDataURL(file);}
   else{upImgSrc='';document.getElementById('uprev').style.display='none';document.getElementById('pdf-nm').style.display='block';document.getElementById('pdf-nm-t').textContent=file.name;}
 }
-function submitExc(){
+async function submitExc(){
   const type=document.getElementById('exc-type').value,txt=document.getElementById('exc-txt').value.trim();
   if(!type||!txt){alert('Please select a reason and write an explanation.');return}
-  excuses.unshift({id:Date.now(),stu:'Jordan Martinez',ini:'JM',ev:'Act 1 Run-through',dt:'May 5',type,txt,img:!!upImgSrc,src:upImgSrc,status:'pending',note:''});
-  tlData[3].ex='pending';closeM('exc-sub');document.getElementById('exc-submit-card').style.display='none';renderAll();
+
+  if (dataMode === 'live') {
+    if (!pendingExcuseTarget) { showToast('No absence selected to excuse.'); return; }
+    const e = activeEns();
+
+    let attachmentPath = null;
+    if (upFile) {
+      const path = `${e.id}/${authSession.user.id}/${Date.now()}-${upFile.name}`;
+      const { error: upErr } = await sb.storage.from('excuse-attachments').upload(path, upFile);
+      if (upErr) { showToast('Could not upload attachment: ' + upErr.message); return; }
+      attachmentPath = path;
+    }
+
+    const { error } = await sb.from('excuses').insert({
+      attendance_id: pendingExcuseTarget.attendanceId, user_id: authSession.user.id, ensemble_id: e.id,
+      type, text: txt, attachment_url: attachmentPath, status: 'pending',
+    });
+    if (error) { showToast('Could not submit excuse: ' + error.message); return; }
+    await loadExcusesFromDB(e);
+    loadEnsembleContext();
+    pendingExcuseTarget = null;
+    upFile = null; upImgSrc = '';
+  } else {
+    excuses.unshift({id:Date.now(),stu:'Jordan Martinez',ini:'JM',ev:'Act 1 Run-through',dt:'May 5',type,txt,img:!!upImgSrc,src:upImgSrc,status:'pending',note:''});
+    tlData[3].ex='pending';
+  }
+
+  closeM('exc-sub');document.getElementById('exc-submit-card').style.display='none';renderAll();
   const stuExcPane2 = document.getElementById('stu-excuses');
   if(stuExcPane2 && stuExcPane2.classList.contains('show')) renderStuExcuses();
 }
@@ -2071,17 +2512,112 @@ function updPol(){
   document.getElementById('v-ded').textContent=ded+'%';
   document.getElementById('v-tardy').textContent=tardy===1?'1 tardy = 1 absence':tardy+' tardies = 1 absence';
   document.getElementById('pol-prev').innerHTML=free===0?`Every absence deducts <strong>${ded}%</strong>. Failing risk at <strong>${fail}</strong> absences.`:`First <strong>${free}</strong> absence${free>1?'s':''} are free. Each additional deducts <strong>${ded}%</strong>. Failing risk at <strong>${fail}</strong> absences.`;
-  document.getElementById('ded-ex').innerHTML=[free+1,free+2,free+3].filter(n=>n<=fail).map(n=>`<span class="gex"><i class="ti ti-minus" style="font-size:11px;color:var(--rd)"></i>${n} abs → −${(n-free)*ded}%</span>`).join('');
-  pol={free,fail,ded,tardy};renderRoster();
+  document.getElementById('ded-ex').innerHTML=[free+1,free+2,free+3].filter(n=>n<=fail).map(n=>`<span class="gex"><i class="ti ti-minus" style="font-size:11px;color:var(--rd)"></i>${n} abs → ${Math.max(0,100-(n-free)*ded)}</span>`).join('');
+  // Preserve excludeExcused — it's set directly by the excused-chips
+  // buttons, not read from a slider here, so a plain {free,fail,ded,tardy}
+  // would silently wipe it back to undefined on the next slider move.
+  pol={free,fail,ded,tardy,excludeExcused:pol.excludeExcused};renderRoster();
 }
 function selChip(btn,grp){document.querySelectorAll('#'+grp+' .chip').forEach(b=>b.classList.remove('on'));btn.classList.add('on')}
+
+function updPoints(){
+  pointsTotal=Math.max(1,parseInt(document.getElementById('r-points-total').value)||1000);
+  pointsPerEvent=Math.max(1,parseInt(document.getElementById('r-points-per-event').value)||5);
+  pointsMode=document.querySelector('#points-mode-chips .chip.on')?.dataset.v||'deduct';
+  document.getElementById('points-prev').innerHTML = pointsMode==='deduct'
+    ? `Every student starts at <strong>${pointsTotal}</strong>. Each absence beyond an approved excuse costs <strong>${pointsPerEvent}</strong> points.`
+    : `Every student starts at <strong>0</strong>. Each rehearsal attended earns <strong>${pointsPerEvent}</strong> points, up to <strong>${pointsTotal}</strong>.`;
+  renderRoster();
+}
+
 function resetGrading(){
   document.getElementById('r-free').value=2;document.getElementById('r-fail').value=4;
   document.getElementById('r-ded').value=5;document.getElementById('r-tardy').value=3;
   selChip(document.querySelector('#exc-win [data-v="48"]'),'exc-win');
   selChip(document.querySelector('#late-chips [data-v="10"]'),'late-chips');
+  selChip(document.querySelector('#excused-chips [data-v="exclude"]'),'excused-chips');
+  pol.excludeExcused = true;
+  document.getElementById('r-points-total').value=1000;
+  document.getElementById('r-points-per-event').value=5;
+  selChip(document.querySelector('#points-mode-chips [data-v="deduct"]'),'points-mode-chips');
   updPol();
+  updPoints();
 }
+
+function mapDbGradingPolicy(row) {
+  return {
+    free: row.free_absences ?? 2, fail: row.fail_threshold ?? 4,
+    ded: row.deduction_pct ?? 5, tardy: row.tardies_per_absence ?? 3,
+    excludeExcused: row.exclude_excused_absences ?? true,
+    model: row.model || 'pct', letterStyle: row.letter_style || 'half',
+    letterRules: row.letter_rules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}],
+    lateWindow: row.late_window_min ?? 10, excWindow: row.excuse_window_hours ?? 48,
+    pointsTotal: row.points_total ?? 1000, pointsPerEvent: row.points_per_event ?? 5,
+    pointsMode: row.points_mode || 'deduct',
+  };
+}
+
+async function loadGradingPolicyFromDB(e) {
+  const { data, error } = await sb.from('grading_policies').select('*').eq('ensemble_id', e.id).maybeSingle();
+  if (error) { console.error(error); return; }
+  if (!data) return; // never saved yet — ensembleDefaults()' pol/gradeModel/letterRules stand
+  const mapped = mapDbGradingPolicy(data);
+  e.pol = { free: mapped.free, fail: mapped.fail, ded: mapped.ded, tardy: mapped.tardy, excludeExcused: mapped.excludeExcused };
+  e.gradeModel = mapped.model;
+  e.letterRules = mapped.letterRules;
+  e.pointsTotal = mapped.pointsTotal;
+  e.pointsPerEvent = mapped.pointsPerEvent;
+  e.pointsMode = mapped.pointsMode;
+  // Read by syncGradingSettingsUI() below — not part of loadEnsembleContext's
+  // swap since there's no dedicated global for them, only DOM chip state.
+  e._lateWindow = mapped.lateWindow;
+  e._excWindow = mapped.excWindow;
+  e._letterStyle = mapped.letterStyle;
+}
+
+// The Settings > Grading sliders/chips are plain HTML with hardcoded
+// defaults — nothing reads `pol`/`gradeModel` into them on load. Harmless
+// in demo mode (nothing ever changes them from those defaults), but once
+// a real policy can be loaded from the DB the tab needs to actually show it.
+function syncGradingSettingsUI(e) {
+  document.getElementById('r-free').value = pol.free;
+  document.getElementById('r-fail').value = pol.fail;
+  document.getElementById('r-ded').value = pol.ded;
+  document.getElementById('r-tardy').value = pol.tardy;
+  updPol();
+  document.getElementById('r-points-total').value = pointsTotal;
+  document.getElementById('r-points-per-event').value = pointsPerEvent;
+  const modeBtn = document.querySelector(`#points-mode-chips [data-v="${pointsMode}"]`);
+  if (modeBtn) selChip(modeBtn, 'points-mode-chips');
+  selectGradeModel(gradeModel); // also runs updPoints() off the values just set above
+  const lateBtn = document.querySelector(`#late-chips [data-v="${e._lateWindow||10}"]`);
+  if (lateBtn) selChip(lateBtn, 'late-chips');
+  const excBtn = document.querySelector(`#exc-win [data-v="${e._excWindow||48}"]`);
+  if (excBtn) selChip(excBtn, 'exc-win');
+  const letterBtn = document.querySelector(`#letter-style-btns [data-v="${e._letterStyle||'half'}"]`);
+  if (letterBtn) selChip(letterBtn, 'letter-style-btns');
+  const excusedBtn = document.querySelector(`#excused-chips [data-v="${pol.excludeExcused === false ? 'include' : 'exclude'}"]`);
+  if (excusedBtn) selChip(excusedBtn, 'excused-chips');
+}
+
+async function saveGradingPolicy(id) {
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const lateWindow  = parseInt(document.querySelector('#late-chips .chip.on')?.dataset.v || 10);
+    const excWindow   = parseInt(document.querySelector('#exc-win .chip.on')?.dataset.v || 48);
+    const letterStyle = document.querySelector('#letter-style-btns .chip.on')?.dataset.v || 'half';
+    const { error } = await sb.from('grading_policies').upsert({
+      ensemble_id: e.id, model: gradeModel,
+      free_absences: pol.free, fail_threshold: pol.fail, deduction_pct: pol.ded, tardies_per_absence: pol.tardy,
+      exclude_excused_absences: pol.excludeExcused,
+      late_window_min: lateWindow, letter_style: letterStyle, letter_rules: letterRules, excuse_window_hours: excWindow,
+      points_total: pointsTotal, points_per_event: pointsPerEvent, points_mode: pointsMode,
+    }, { onConflict: 'ensemble_id' });
+    if (error) { showToast('Could not save grading policy: ' + error.message); return; }
+  }
+  flash(id);
+}
+
 function saveAll(id){flash(id)}
 
 /* NOTIFICATION RULES */
@@ -2135,20 +2671,70 @@ function renderRules(){
       </div>
     </div>`).join('');
 }
-function togRule(id){const r=rules.find(r=>r.id===id);if(r){r.on=!r.on;renderRules()}}
-function updRule(id,k,v){const r=rules.find(r=>r.id===id);if(r)r[k]=v}
-function delRule(id){rules=rules.filter(r=>r.id!==id);renderRules()}
-function addRule(){rules.push({id:Date.now(),on:true,lbl:'New rule',trig:'end_of_event',off:0,unit:'min',tpl:'absence'});renderRules()}
+function mapDbRule(row) {
+  return { id: row.id, on: row.enabled, lbl: row.label || 'New rule', trig: row.trigger || 'end_of_event',
+    off: row.offset_value || 0, unit: row.offset_unit || 'min', tpl: row.template_key || 'absence' };
+}
+
+async function loadNotificationRulesFromDB(e) {
+  const { data, error } = await sb.from('notification_rules').select('*').eq('ensemble_id', e.id);
+  if (error) { console.error(error); showToast('Could not load notification rules: ' + error.message); return; }
+  e.rules = (data || []).map(mapDbRule);
+}
+
+async function togRule(id){
+  const r=rules.find(r=>r.id===id); if(!r) return;
+  r.on=!r.on;
+  if (dataMode === 'live') {
+    const { error } = await sb.from('notification_rules').update({ enabled: r.on }).eq('id', id);
+    if (error) { showToast('Could not update rule: ' + error.message); r.on=!r.on; renderRules(); return; }
+  }
+  renderRules();
+}
+async function updRule(id,k,v){
+  const r=rules.find(r=>r.id===id); if(!r) return;
+  r[k]=v;
+  if (dataMode === 'live') {
+    const colMap = { trig: 'trigger', off: 'offset_value', unit: 'offset_unit', tpl: 'template_key', lbl: 'label' };
+    const col = colMap[k];
+    if (!col) return;
+    const { error } = await sb.from('notification_rules')
+      .update({ [col]: k === 'off' ? parseInt(v) : v }).eq('id', id);
+    if (error) showToast('Could not update rule: ' + error.message);
+  }
+}
+async function delRule(id){
+  if (dataMode === 'live') {
+    const { error } = await sb.from('notification_rules').delete().eq('id', id);
+    if (error) { showToast('Could not delete rule: ' + error.message); return; }
+  }
+  rules=rules.filter(r=>r.id!==id);
+  renderRules();
+}
+async function addRule(){
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { data, error } = await sb.from('notification_rules').insert({
+      ensemble_id: e.id, label: 'New rule', enabled: true, trigger: 'end_of_event',
+      offset_value: 0, offset_unit: 'min', template_key: 'absence',
+    }).select().single();
+    if (error) { showToast('Could not add rule: ' + error.message); return; }
+    rules.push(mapDbRule(data));
+  } else {
+    rules.push({id:Date.now(),on:true,lbl:'New rule',trig:'end_of_event',off:0,unit:'min',tpl:'absence'});
+  }
+  renderRules();
+}
 
 /* EMAIL TEMPLATES */
 const tokens=[
   {k:'{{student_name}}',l:'Student name'},{k:'{{event_name}}',l:'Event name'},
   {k:'{{event_date}}',l:'Event date'},{k:'{{absence_count}}',l:'Absence count'},
-  {k:'{{absences_remaining}}',l:'Absences remaining'},{k:'{{grade_impact}}',l:'Grade impact'},
+  {k:'{{absences_remaining}}',l:'Absences remaining'},
   {k:'{{excuse_deadline}}',l:'Excuse deadline'},{k:'{{production_name}}',l:'Production name'},
   {k:'{{teacher_name}}',l:'Teacher name'},{k:'{{teacher_email}}',l:'Teacher email'},
 ];
-const sample={'{{student_name}}':'Jordan Martinez','{{event_name}}':'Main Stage Rehearsal','{{event_date}}':'Monday, May 12','{{absence_count}}':'3','{{absences_remaining}}':'1','{{grade_impact}}':'−5%','{{excuse_deadline}}':'Wednesday, May 14 at 7:00 pm','{{production_name}}':'Into the Woods','{{teacher_name}}':'Ms. Rivera','{{teacher_email}}':'mrivera@school.edu'};
+const sample={'{{student_name}}':'Jordan Martinez','{{event_name}}':'Main Stage Rehearsal','{{event_date}}':'Monday, May 12','{{absence_count}}':'3','{{absences_remaining}}':'1','{{excuse_deadline}}':'Wednesday, May 14 at 7:00 pm','{{production_name}}':'Into the Woods','{{teacher_name}}':'Ms. Rivera','{{teacher_email}}':'mrivera@school.edu'};
 const defTpls={
   absence:{s:'Absence recorded — {{event_name}} on {{event_date}}',b:`Hi {{student_name}},
 
@@ -2164,7 +2750,8 @@ If you have a valid excuse, please submit it by {{excuse_deadline}}.
 You've now used all your free absences for {{production_name}}. Any further absences will impact your grade.
 
 Absences so far: {{absence_count}}
-Grade impact: {{grade_impact}}
+
+Consult your syllabus to see how this affects your grade.
 
 Please make every effort to attend remaining rehearsals.
 
@@ -2174,7 +2761,7 @@ Please make every effort to attend remaining rehearsals.
 
 You have {{absence_count}} absences in {{production_name}}, which puts you at risk of a failing grade.
 
-Current grade impact: {{grade_impact}}
+Consult your syllabus to see how this affects your grade.
 
 Please contact me as soon as possible to discuss a plan.
 
@@ -2190,7 +2777,8 @@ Your excuse for {{event_name}} on {{event_date}} has been approved. This absence
 After review, your excuse for {{event_name}} on {{event_date}} was not approved.
 
 Absence count: {{absence_count}}
-Grade impact: {{grade_impact}}
+
+Consult your syllabus to see how this affects your grade.
 
 Please reach out if you'd like to discuss this.
 
@@ -2202,13 +2790,22 @@ function switchTpl(key,btn){document.querySelectorAll('#tpl-tabs .chip').forEach
 function loadTpl(key){document.getElementById('tpl-subj').value=tpls[key].s;document.getElementById('tpl-body').value=tpls[key].b;updPrev()}
 function updPrev(){let p='Subject: '+document.getElementById('tpl-subj').value+'\n\n'+document.getElementById('tpl-body').value;tokens.forEach(t=>{p=p.split(t.k).join(sample[t.k]||t.k)});document.getElementById('tpl-prev').textContent=p}
 function insertTok(k){const ta=document.getElementById('tpl-body');const s=ta.selectionStart,e=ta.selectionEnd;ta.value=ta.value.slice(0,s)+k+ta.value.slice(e);ta.selectionStart=ta.selectionEnd=s+k.length;ta.focus();tpls[curTpl].b=ta.value;updPrev()}
-function saveTpl(){tpls[curTpl].s=document.getElementById('tpl-subj').value;tpls[curTpl].b=document.getElementById('tpl-body').value;flash('cfm-tpl')}
-function resetTpl(){
+async function saveTpl(){
+  tpls[curTpl].s=document.getElementById('tpl-subj').value;
+  tpls[curTpl].b=document.getElementById('tpl-body').value;
+  if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, tpls[curTpl].s, tpls[curTpl].b); if (!ok) return; }
+  flash('cfm-tpl');
+}
+async function resetTpl(){
   if(defTpls[curTpl]) {
-    tpls[curTpl]=JSON.parse(JSON.stringify(defTpls[curTpl]));loadTpl(curTpl);
+    tpls[curTpl]=JSON.parse(JSON.stringify(defTpls[curTpl]));
+    if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, tpls[curTpl].s, tpls[curTpl].b); if (!ok) return; }
+    loadTpl(curTpl);
   } else {
     if(confirm('Clear this custom template?')) {
-      tpls[curTpl]={s:'',b:''};loadTpl(curTpl);
+      tpls[curTpl]={s:'',b:''};
+      if (dataMode === 'live') { const ok = await upsertTemplateToDB(curTpl, '', ''); if (!ok) return; }
+      loadTpl(curTpl);
     }
   }
 }
@@ -2262,19 +2859,24 @@ function parsePaste() {
   btn.style.display = parsedStudents.length ? 'inline-flex' : 'none';
 }
 
-function importPasted() {
+async function importPasted() {
   if(!parsedStudents.length) return;
-  students.push(...parsedStudents);
+  const sendInvites = document.getElementById('send-invites').checked;
+  if (dataMode === 'live') {
+    const ok = await insertRosterMembers(parsedStudents, sendInvites);
+    if (!ok) return;
+  } else {
+    students.push(...parsedStudents);
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('import');
+  const ct = parsedStudents.length;
   parsedStudents = [];
   document.getElementById('paste-input').value = '';
   document.getElementById('paste-preview').style.display = 'none';
   document.getElementById('paste-import-btn').style.display = 'none';
-  const sendInvites = document.getElementById('send-invites').checked;
-  // In production: fire invite emails here
-  showToast(parsedStudents.length + ' students imported' + (sendInvites ? ' — invites sent!' : '.'));
+  showToast(ct + ' students imported' + (sendInvites ? ' — invites sent!' : '.'));
 }
 
 function handleCSV(input) {
@@ -2306,24 +2908,59 @@ function handleCSV(input) {
   reader.readAsText(file);
 }
 
-function importCSV() {
+async function importCSV() {
   if(!parsedCSV.length) return;
-  students.push(...parsedCSV);
+  const sendInvites = document.getElementById('send-invites').checked;
+  if (dataMode === 'live') {
+    const ok = await insertRosterMembers(parsedCSV, sendInvites);
+    if (!ok) return;
+  } else {
+    students.push(...parsedCSV);
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('import');
   const ct = parsedCSV.length;
   parsedCSV = [];
-  showToast(ct + ' students imported from CSV!');
+  showToast(ct + ' students imported from CSV' + (sendInvites ? ' — invites sent!' : '.'));
 }
 
-function addStudent() {
+// Shared by importPasted()/importCSV(): inserts {n,e,r} rows into
+// ensemble_members (no user_id yet — see migration 0003) and reloads the
+// roster so e.students/students[] reflect what actually landed in the DB.
+async function insertRosterMembers(rows, sendInvites) {
+  const e = activeEns();
+  const { error } = await sb.from('ensemble_members').insert(rows.map(s => ({
+    ensemble_id: e.id, name: s.n, email: s.e || null, part: s.r,
+    role: 'student', status: 'active',
+  })));
+  if (error) { showToast('Import failed: ' + error.message); return false; }
+  await loadRosterFromDB(e);
+  loadEnsembleContext();
+  if (sendInvites) rows.forEach(s => sendWelcomeEmail(e, s.n, s.e));
+  return true;
+}
+
+async function addStudent() {
   const n = document.getElementById('new-s-name').value.trim();
   const email = document.getElementById('new-s-email').value.trim();
   const r = document.getElementById('new-s-role').value.trim() || 'Ensemble';
   if(!n) { alert('Please enter a name.'); return; }
-  const i = n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  students.push({n, i, r, e:email, s:'present', t:'—', a:0});
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensemble_members').insert({
+      ensemble_id: e.id, name: n, email: email || null, part: r,
+      role: 'student', status: 'active',
+    });
+    if (error) { showToast('Could not add student: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+    if (email) sendWelcomeEmail(e, n, email);
+  } else {
+    const i = n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    students.push({n, i, r, e:email, s:'present', t:'—', a:0});
+  }
   document.getElementById('roster-count').textContent = students.length;
   renderRoster();
   closeM('student');
@@ -2331,7 +2968,76 @@ function addStudent() {
   document.getElementById('new-s-email').value='';
   document.getElementById('new-s-role').value='';
   document.getElementById('new-s-parent').value='';
-  showToast(n + ' added — invite sent to ' + (email||'student'));
+  showToast(n + ' added' + (dataMode==='live' && email ? ' — invite sent!' : '.'));
+}
+
+// Teacher-side fix for a student's name/email/role — most useful for a
+// name that got auto-derived from an email address (see nameFromEmail())
+// before the student either filled in the login screen's name field or
+// used the pencil in their own topbar (saveEditName()) to fix it
+// themselves. Teachers already have full UPDATE rights on their own
+// ensemble's ensemble_members rows (existing RLS), so no new migration
+// was needed for this one.
+function openEditStudent(memberId) {
+  const s = students.find(st => String(st.memberId) === String(memberId));
+  if (!s) return;
+  document.getElementById('edit-s-id').value = memberId;
+  document.getElementById('edit-s-name').value = s.n || '';
+  document.getElementById('edit-s-email').value = s.e || '';
+  document.getElementById('edit-s-role').value = s.r || '';
+  openM('edit-student');
+}
+
+async function saveEditStudent() {
+  const memberId = document.getElementById('edit-s-id').value;
+  const n = document.getElementById('edit-s-name').value.trim();
+  const email = document.getElementById('edit-s-email').value.trim();
+  const r = document.getElementById('edit-s-role').value.trim() || 'Ensemble';
+  if (!n) { alert('Please enter a name.'); return; }
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensemble_members')
+      .update({ name: n, email: email || null, part: r }).eq('id', memberId);
+    if (error) { showToast('Could not save: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    const s = students.find(st => String(st.memberId) === String(memberId));
+    if (s) { s.n = n; s.i = initialsFromName(n); s.e = email; s.r = r; }
+  }
+  renderRoster();
+  closeM('edit-student');
+  showToast('Student updated!');
+}
+
+// Drops a student from this ensemble's roster (e.g. they left the class).
+// Their past attendance/excuse rows aren't deleted — those key off
+// user_id + ensemble_id, not this ensemble_members row, so removing it
+// just takes them out of the active roster, grading, and reports going
+// forward, not out of the historical record.
+async function removeStudent() {
+  const memberId = document.getElementById('edit-s-id').value;
+  const s = students.find(st => String(st.memberId) === String(memberId));
+  if (!s) return;
+  if (!confirm(`Remove ${s.n} from the roster? Their past attendance and excuse history stays on record, but they'll no longer count toward grading or reports here. This can't be undone from this screen — they'd need a new invite link to rejoin.`)) return;
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensemble_members').delete().eq('id', memberId);
+    if (error) { showToast('Could not remove: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    // students is declared `const` — mutate in place rather than reassign.
+    const kept = students.filter(st => String(st.memberId) !== String(memberId));
+    students.length = 0;
+    students.push(...kept);
+  }
+  document.getElementById('roster-count').textContent = students.length;
+  renderRoster();
+  closeM('edit-student');
+  showToast(s.n + ' removed from roster.');
 }
 
 function showToast(msg) {
@@ -2357,9 +3063,22 @@ let qrSize = 220;
 function genQR() {
   const typeBtn = document.querySelector('#qr-type-btns .chip.on');
   const type = typeBtn ? typeBtn.dataset.v : 'checkin';
-  const url = type === 'homescreen'
-    ? 'https://calltime.app/join?setup=1'
-    : 'https://calltime.app/checkin?event=tonight';
+  let url;
+  if (dataMode === 'live') {
+    // Real deep link back to this app — see handleCheckinDeepLink().
+    const base = window.location.origin + window.location.pathname;
+    const ev = pickTodayEvent();
+    url = type === 'homescreen' ? base : (ev ? `${base}?checkin=${ev.id}&ensemble=${activeEns().id}` : base);
+    const nameEl = document.getElementById('qr-event-name');
+    const subEl = document.getElementById('qr-sub');
+    if (nameEl) nameEl.textContent = (ev ? ev.n : 'No event scheduled today') + ' · Tonight';
+    if (subEl) subEl.textContent = ev ? ev.n : 'No event today';
+  } else {
+    // demo mode: unchanged — the original mockup URL, no real route behind it
+    url = type === 'homescreen'
+      ? 'https://calltime.app/join?setup=1'
+      : 'https://calltime.app/checkin?event=tonight';
+  }
   loadQRLib(() => {
     qrInstance = new QRious({
       element: document.getElementById('qr-canvas'),
@@ -2411,6 +3130,78 @@ function printQR() {
     </div>
     </body></html>`);
   win.document.close();
+}
+
+// Builds this ensemble's invite link (see handleJoinDeepLink()) and copies
+// it to the clipboard — the replacement for the old browse-all-ensembles
+// "request to join" flow. Just the ensemble's id in a query param, so
+// anyone signed in who has the link can join; there's no separate invite
+// token. That's an accepted tradeoff for a single-teacher classroom tool,
+// not a hardened invite system.
+async function copyInviteLink() {
+  const e = activeEns();
+  if (!e || dataMode !== 'live') { showToast('Invite links need live mode (real sign-in).'); return; }
+  const url = `${window.location.origin}${window.location.pathname}?join=${e.id}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Invite link copied!');
+  } catch (err) {
+    showToast('Could not copy automatically — link: ' + url);
+  }
+}
+
+// Emails a student a teacher just added directly (addStudent()/roster
+// import) their invite link. They're already an active member at this
+// point — the link is just "click here to get started"; handleJoinDeepLink()
+// no-ops the membership insert if one already exists, so it's safe to send
+// regardless. Fire-and-forget, same pattern as the other notification sends.
+function sendWelcomeEmail(e, name, email) {
+  if (!email) return;
+  const url = `${window.location.origin}${window.location.pathname}?join=${e.id}`;
+  sendEmail(email, `You're in — ${e.name} on Call Time`,
+    `Hi ${name},\n\n${e.teacher || 'Your director'} added you to ${e.name} on Call Time. Sign in here to get started:\n${url}`);
+}
+
+// Reflects e.archivedAt on Settings > General's archive button — called
+// whenever a teacher enters an ensemble (enterEnsemble()) and right after
+// toggleArchiveEnsemble() changes it.
+function syncArchiveButton(e) {
+  const btn = document.getElementById('archive-ens-btn');
+  if (!btn) return;
+  btn.innerHTML = e.archivedAt
+    ? '<i class="ti ti-archive-off"></i>Unarchive ensemble'
+    : '<i class="ti ti-archive"></i>Archive ensemble';
+}
+
+async function toggleArchiveEnsemble() {
+  const e = activeEns();
+  const archiving = !e.archivedAt;
+  if (dataMode === 'live') {
+    const { error } = await sb.from('ensembles')
+      .update({ archived_at: archiving ? new Date().toISOString() : null }).eq('id', e.id);
+    if (error) { showToast('Could not update: ' + error.message); return; }
+  }
+  e.archivedAt = archiving ? new Date().toISOString() : null;
+  showToast(archiving ? e.name + ' archived.' : e.name + ' unarchived.');
+  if (archiving) { goLanding(); return; } // an archived ensemble shouldn't stay open in the teacher view
+  syncArchiveButton(e);
+}
+
+async function deleteEnsemble() {
+  const e = activeEns();
+  if (!confirm(`Permanently delete "${e.name}"? This removes all its events, attendance, excuses, and roster data. This cannot be undone.`)) return;
+  if (dataMode === 'live') {
+    // Every other table's ensemble_id FK is `on delete cascade` (see
+    // 0001_init_schema.sql), so this one delete is enough to remove
+    // everything tied to this ensemble.
+    const { error } = await sb.from('ensembles').delete().eq('id', e.id);
+    if (error) { showToast('Could not delete: ' + error.message); return; }
+    await loadEnsemblesFromDB();
+  } else {
+    ensembles = ensembles.filter(en => en !== e);
+  }
+  showToast(e.name + ' deleted.');
+  goLanding(true);
 }
 
 /* CUSTOM RECURRENCE */
@@ -2512,7 +3303,22 @@ function updateReminderTo(val) {
   document.getElementById('rem-send-ct').textContent = ct;
 }
 
-function sendReminder() {
+async function sendReminder() {
+  if (dataMode === 'live') {
+    const filter = document.querySelector('#m-reminder .chip.on')?.dataset.v || 'all';
+    const recipients = (filter === 'absent' ? students.filter(s=>s.s==='absent') : students)
+      .map(s=>s.e).filter(Boolean);
+    if (!recipients.length) { showToast('No student emails on file to send to.'); return; }
+    const subject = document.getElementById('rem-subject')?.value || 'Rehearsal reminder';
+    const body = document.getElementById('rem-body')?.value || '';
+    const results = await Promise.all(recipients.map(to => sendEmail(to, subject, body)));
+    const failCount = results.filter(ok=>!ok).length;
+    closeM('reminder');
+    showToast(failCount
+      ? `Sent, but ${failCount} email(s) failed.`
+      : 'Reminder sent to ' + recipients.length + ' student' + (recipients.length!==1?'s':'') + '!');
+    return;
+  }
   closeM('reminder');
   showToast('Reminder sent to ' + document.getElementById('rem-send-ct').textContent + ' students!');
 }
@@ -2526,13 +3332,24 @@ function getReportData() {
     const present = s.s === 'present' ? 1 : 0;
     const late    = s.s === 'late'    ? 1 : 0;
     const absent  = s.a;
-    const excused = Math.floor(s.a * 0.3);
-    const unexcused = s.a - excused;
-    const over = Math.max(0, s.a - pol.free);
-    const gradeImpact = over * pol.ded;
-    const atRisk = s.a >= pol.fail - 1;
-    const failing = s.a >= pol.fail;
-    return {n:s.n, i:s.i, r:s.r, present, late, absent, excused, unexcused, gradeImpact, atRisk, failing};
+    // Live mode: s.aExcused is a real count (see loadRosterFromDB()). Demo
+    // mode never had that data — keep its original fabricated 30% split
+    // rather than showing 0 excused for every demo student.
+    const excused = dataMode === 'live' ? (s.aExcused || 0) : Math.floor(s.a * 0.3);
+    const unexcused = Math.max(0, s.a - excused);
+    const ga = gradedAbsences(s);
+    let score, scoreMax, atRisk, failing;
+    if (gradeModel === 'points') {
+      score = pointsBalance(s); scoreMax = pointsTotal;
+      atRisk = score < scoreMax * 0.5; failing = score <= 0;
+    } else {
+      score = Math.max(0, 100 - Math.max(0, ga - pol.free) * pol.ded); scoreMax = 100;
+      atRisk = ga >= pol.fail - 1; failing = ga >= pol.fail;
+    }
+    // The number shown in place of the old "−15%" deduction — the resulting
+    // grade/balance itself, not how much was taken off it.
+    const scoreLabel = gradeModel === 'points' ? `${score} / ${scoreMax}` : String(score);
+    return {n:s.n, i:s.i, r:s.r, present, late, absent, excused, unexcused, score, scoreMax, scoreLabel, atRisk, failing};
   });
 }
 
@@ -2559,7 +3376,7 @@ function renderReportModal() {
         <div style="flex:1"><div style="font-size:13px;font-weight:500">${r.n}</div><div style="font-size:11px;color:var(--t2)">${r.r}</div></div>
         <div style="text-align:right">
           <div style="font-size:13px;font-weight:600;color:${r.failing?'var(--rd)':'var(--am)'}">${r.absent} absences</div>
-          ${r.gradeImpact>0?`<div style="font-size:11px;color:var(--am)">−${r.gradeImpact}% grade</div>`:''}
+          ${r.score<r.scoreMax?`<div style="font-size:11px;color:var(--am)">${r.scoreLabel} grade</div>`:''}
         </div>
         ${r.failing?'<span class="badge br">Failing risk</span>':'<span class="badge ba">Warning</span>'}
       </div>`).join('');
@@ -2569,7 +3386,11 @@ function renderReportModal() {
   }
 
   document.getElementById('rep-list').innerHTML = data.map(r=>{
-    const pct = Math.min(Math.round((r.absent/pol.fail)*100),100);
+    // How much of the grade/pool has been lost, as a bar-fill fraction —
+    // works the same way for the pct model (100-score)/100 and the points
+    // model (total-balance)/total, unlike the old absent/pol.fail ratio
+    // which only made sense for the pct model.
+    const pct = Math.min(100,Math.max(0,Math.round((1-r.score/r.scoreMax)*100)));
     const fill = r.failing?'#E24B4A':r.atRisk?'#EF9F27':'#63A322';
     return `<div style="display:grid;grid-template-columns:2fr 0.6fr 0.6fr 0.6fr 1fr;gap:8px;padding:9px 0;border-bottom:.5px solid var(--bd);align-items:center">
       <div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:26px;height:26px;font-size:9px">${r.i}</div><div style="font-size:13px;font-weight:500">${r.n}</div></div>
@@ -2577,8 +3398,8 @@ function renderReportModal() {
       <div style="font-size:12px;color:var(--am);text-align:center;font-weight:500">${r.late}</div>
       <div style="font-size:12px;color:var(--rd);text-align:center;font-weight:600">${r.absent}</div>
       <div>
-        <div style="display:flex;justify-content:flex-end;font-size:11px;color:${r.gradeImpact>0?'var(--am)':'var(--t3)'}">
-          ${r.gradeImpact>0?'−'+r.gradeImpact+'%':'-'}
+        <div style="display:flex;justify-content:flex-end;font-size:11px;color:${r.score<r.scoreMax?'var(--am)':'var(--t3)'}">
+          ${r.scoreLabel}
         </div>
         <div style="height:4px;background:var(--s2);border-radius:2px;margin-top:3px;overflow:hidden">
           <div style="height:100%;border-radius:2px;width:${pct}%;background:${fill}"></div>
@@ -2609,7 +3430,7 @@ function renderReportTab() {
 
   document.getElementById('report-table').innerHTML = sorted.map(r => {
     const fill = r.failing?'#E24B4A':r.atRisk?'#EF9F27':'#63A322';
-    const pct = Math.min(Math.round((r.absent/pol.fail)*100),100);
+    const pct = Math.min(100,Math.max(0,Math.round((1-r.score/r.scoreMax)*100)));
     return `<div style="display:grid;grid-template-columns:2fr 0.7fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr;gap:0;padding:11px 16px;border-bottom:.5px solid var(--bd);align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
         <div class="avatar" style="width:28px;height:28px;font-size:10px">${r.i}</div>
@@ -2621,8 +3442,8 @@ function renderReportTab() {
       <div style="font-size:13px;color:var(--gn);text-align:center">${r.excused}</div>
       <div style="font-size:13px;color:var(--rd);text-align:center">${r.unexcused}</div>
       <div style="text-align:right">
-        <div style="font-size:12px;font-weight:600;color:${r.gradeImpact>0?'var(--am)':'var(--t3)'}">
-          ${r.gradeImpact>0?'−'+r.gradeImpact+'%':'-'}
+        <div style="font-size:12px;font-weight:600;color:${r.score<r.scoreMax?'var(--am)':'var(--t3)'}">
+          ${r.scoreLabel}
         </div>
         <div style="height:4px;background:var(--s2);border-radius:2px;margin-top:4px;overflow:hidden">
           <div style="height:100%;border-radius:2px;width:${pct}%;background:${fill}"></div>
@@ -2641,8 +3462,8 @@ function sortReport(key) {
 function exportCSV() {
   const data = getReportData();
   const rows = [
-    ['Name','Role','Present','Late','Absent','Excused','Unexcused','Grade Impact'],
-    ...data.map(r=>[r.n,r.r,r.present,r.late,r.absent,r.excused,r.unexcused,r.gradeImpact>0?'-'+r.gradeImpact+'%':'-'])
+    ['Name','Role','Present','Late','Absent','Excused','Unexcused','Grade'],
+    ...data.map(r=>[r.n,r.r,r.present,r.late,r.absent,r.excused,r.unexcused,r.scoreLabel])
   ];
   const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv'});
@@ -2664,7 +3485,7 @@ function exportPDF() {
       <td style="padding:8px 12px;text-align:center;font-weight:700;color:#A32D2D">${r.absent}</td>
       <td style="padding:8px 12px;text-align:center;color:#3B6D11">${r.excused}</td>
       <td style="padding:8px 12px;text-align:center;color:#A32D2D">${r.unexcused}</td>
-      <td style="padding:8px 12px;text-align:right;color:${r.gradeImpact>0?'#854F0B':'#999'}">${r.gradeImpact>0?'-'+r.gradeImpact+'%':'-'}</td>
+      <td style="padding:8px 12px;text-align:right;color:${r.score<r.scoreMax?'#854F0B':'#999'}">${r.scoreLabel}</td>
     </tr>`).join('');
 
   const win = window.open('','_blank');
@@ -2683,7 +3504,7 @@ function exportPDF() {
   <div class="risk-names">${atRisk.map(r=>r.n+' ('+r.absent+' abs)').join(' · ')}</div></div>`:''}
   <table><thead><tr>
     <th>Name</th><th>Role</th><th class="num">Present</th><th class="num">Late</th>
-    <th class="num">Absent</th><th class="num">Excused</th><th class="num">Unexcused</th><th style="text-align:right">Grade impact</th>
+    <th class="num">Absent</th><th class="num">Excused</th><th class="num">Unexcused</th><th style="text-align:right">Grade</th>
   </tr></thead><tbody>${rows}</tbody></table>
   <div class="footer">Call Time · Exported by teacher · ${students.length} students · ${data.reduce((s,r)=>s+r.absent,0)} total absences</div>
   </body></html>`);
@@ -2693,7 +3514,7 @@ function exportPDF() {
 
 
 /* SAVE EVENT */
-function saveEvent() {
+async function saveEvent() {
   const name   = document.getElementById('ev-name').value.trim();
   const date   = document.getElementById('ev-date').value;
   const typeEl = document.getElementById('ev-type');
@@ -2709,48 +3530,63 @@ function saveEvent() {
   if(!name) { alert('Please enter an event name.'); return; }
   if(!date)  { alert('Please select a date.'); return; }
 
-  // Format display date
-  const d = new Date(date + 'T00:00');
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
-
-  // Format time range
-  function fmt(t) {
-    if(!t) return '';
-    const [h,m] = t.split(':').map(Number);
-    return (h%12||12) + (m?':'+String(m).padStart(2,'0'):'') + (h>=12?' pm':' am');
-  }
-  const timeStr = start && end ? fmt(start) + '–' + fmt(end) : start ? fmt(start) : '';
-
-  // Recurrence label
-  let recurLabel = '';
-  if(recurSel === 'weekly')  recurLabel = ' · Weekly';
-  else if(recurSel === 'monwed') recurLabel = ' · Mon & Wed';
-  else if(recurSel === 'mwf')    recurLabel = ' · Mon/Wed/Fri';
-  else if(recurSel === 'custom') {
-    const days = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b=>b.dataset.v);
-    const every = document.getElementById('recur-every').value;
-    const unit  = document.getElementById('recur-unit').value;
-    if(days.length) recurLabel = ' · Every ' + (every>1?every+' ':'') + unit + (every>1?'s':'') + ' (' + days.join('/') + ')';
-  }
-
-  // Dot color by type
-  const typeToDot = { 'Rehearsal':'ep', 'Tech week':'ea', 'Dress rehearsal':'ea', 'Performance':'et', 'Meeting':'ep' };
   const typeVal = typeEl.options[typeEl.selectedIndex].value || typeEl.value;
-  const dot = typeToDot[typeVal] || 'ep';
+  const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
 
-  evList.push({ n: name + recurLabel, d: dispDate, t: timeStr, type: typeVal, dot, venue });
+  let liveToastMsg = 'Event saved: ' + name;
+  if (dataMode === 'live') {
+    const geo = pendingEventGeo.ev;
+    const startDateObj = new Date(date + 'T00:00');
+    const occurrences = computeRecurrenceDates(startDateObj, recurSel);
+    const ok = await insertRecurringEvents({
+      name, type: typeVal, callTime: call, startTime: start, endTime: end, venue, dress,
+      program: programPills, notes,
+      geoLat: geo ? geo.lat : null, geoLng: geo ? geo.lng : null,
+      geoRadius: parseInt(document.getElementById('ev-geo-radius').value) || 50,
+    }, occurrences);
+    if (!ok) return;
+    if (occurrences.length > 1) liveToastMsg = occurrences.length + ' events created (recurring).';
+    pendingEventGeo.ev = null;
+    document.getElementById('ev-geo-status').textContent = 'No location set — check-in won\'t be location-restricted';
+    document.getElementById('ev-geo-radius').value = 50;
+    document.getElementById('gr-v').textContent = '50m';
+  } else {
+    // Format display date
+    const d = new Date(date + 'T00:00');
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
 
-  // Sort by date
-  evList.sort((a,b) => {
-    const parse = s => { const p=s.split(' '); return new Date(p[2]+' '+p[1]+' 2026'); };
-    return parse(a.d) - parse(b.d);
-  });
+    // Format time range
+    function fmt(t) {
+      if(!t) return '';
+      const [h,m] = t.split(':').map(Number);
+      return (h%12||12) + (m?':'+String(m).padStart(2,'0'):'') + (h>=12?' pm':' am');
+    }
+    const timeStr = start && end ? fmt(start) + '–' + fmt(end) : start ? fmt(start) : '';
+
+    // Recurrence label
+    let recurLabel = '';
+    if(recurSel === 'weekly')  recurLabel = ' · Weekly';
+    else if(recurSel === 'monwed') recurLabel = ' · Mon & Wed';
+    else if(recurSel === 'mwf')    recurLabel = ' · Mon/Wed/Fri';
+    else if(recurSel === 'custom') {
+      const days = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b=>b.dataset.v);
+      const every = document.getElementById('recur-every').value;
+      const unit  = document.getElementById('recur-unit').value;
+      if(days.length) recurLabel = ' · Every ' + (every>1?every+' ':'') + unit + (every>1?'s':'') + ' (' + days.join('/') + ')';
+    }
+
+    const dot = typeDotMap[(typeVal||'').toLowerCase()] || 'ep';
+    evList.push({ n: name + recurLabel, d: dispDate, t: timeStr, type: typeVal, dot, venue,
+                  callTime: call ? fmt(call) : '', dress, program: programPills, notes, dateObj: d });
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+  }
 
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('event');
-  showToast('Event saved: ' + name);
+  showToast(dataMode === 'live' ? liveToastMsg : 'Event saved: ' + name);
 
   // Reset form
   document.querySelector('#m-event input[type=text]').value = '';
@@ -2782,11 +3618,12 @@ function renderCal() {
     return (a.n||'').localeCompare(b.n||'');
   });
 
-  // Group by month+year
+  // Group by month+year (from dateObj, not a hardcoded year — events can
+  // now span real years once wired to the DB, not just the 2026 demo term)
+  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const groups = {};
   sorted.forEach(e => {
-    const parts = (e.d||'').split(' ');
-    const month = parts.length >= 2 ? parts[1] + ' 2026' : 'Upcoming';
+    const month = e.dateObj ? monNames[e.dateObj.getMonth()] + ' ' + e.dateObj.getFullYear() : 'Upcoming';
     if(!groups[month]) groups[month] = [];
     groups[month].push(e);
   });
@@ -2868,10 +3705,16 @@ function openCalEdit(idx) {
   document.getElementById('ce-dress').value = e.dress || '';
   document.getElementById('ce-program').value = e.program ? e.program.join('\n') : '';
   document.getElementById('ce-notes').value  = e.notes || '';
+  pendingEventGeo.ce = null;
+  document.getElementById('ce-geo-radius').value = e.geoRadius || 50;
+  document.getElementById('ce-gr-v').textContent = (e.geoRadius || 50) + 'm';
+  document.getElementById('ce-geo-status').textContent = e.geoLat != null
+    ? 'Location set — check-in is restricted to the radius above.'
+    : 'No location set — check-in won\'t be location-restricted.';
   openM('cal-edit');
 }
 
-function saveCalEdit() {
+async function saveCalEdit() {
   const idx  = parseInt(document.getElementById('ce-idx').value);
   const e    = evList[idx];
   if(!e) return;
@@ -2889,37 +3732,65 @@ function saveCalEdit() {
 
   if(!name) { alert('Event name is required.'); return; }
 
-  // Format display date
-  let dispDate = e.d;
-  let dateObj  = e.dateObj;
-  if(date) {
-    const d = new Date(date + 'T00:00');
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
-    dateObj  = d;
-  }
-
-  const timeStr = end ? start + '–' + end : start;
-  const dot = typeDotMap[(type||'').toLowerCase()] || 'ep';
   const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
 
-  // Update in place
-  evList[idx] = { ...e, n:name, d:dispDate, t:timeStr, type, dot, venue, callTime:call,
-                  dress, program:programPills, notes, dateObj };
+  if (dataMode === 'live') {
+    // ce-start/ce-end/ce-call are free-text 12h strings (e.g. "7:00 pm"),
+    // unlike ev-*/te-* which are real <input type="time">; normalize before
+    // storing so fmt12() reads them back correctly next load.
+    const geo = pendingEventGeo.ce;
+    const ok = await upsertEventToDB({
+      name, type, eventDate: date || e.eventDate,
+      callTime: normalizeTimeTo24h(call) || e.callTimeRaw,
+      startTime: normalizeTimeTo24h(start) || e.startTime,
+      endTime: normalizeTimeTo24h(end) || e.endTime,
+      venue, dress, program: programPills, notes,
+      geoLat: geo ? geo.lat : e.geoLat, geoLng: geo ? geo.lng : e.geoLng,
+      geoRadius: parseInt(document.getElementById('ce-geo-radius').value) || e.geoRadius || 50,
+    }, e.id);
+    if (!ok) return;
+    pendingEventGeo.ce = null;
+  } else {
+    // Format display date
+    let dispDate = e.d;
+    let dateObj  = e.dateObj;
+    if(date) {
+      const d = new Date(date + 'T00:00');
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      dispDate = dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
+      dateObj  = d;
+    }
 
-  // Re-sort
-  evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+    const timeStr = end ? start + '–' + end : start;
+    const dot = typeDotMap[(type||'').toLowerCase()] || 'ep';
+
+    // Update in place
+    evList[idx] = { ...e, n:name, d:dispDate, t:timeStr, type, dot, venue, callTime:call,
+                    dress, program:programPills, notes, dateObj };
+
+    // Re-sort
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+  }
 
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-edit');
   showToast('Event updated!');
 }
 
-function deleteCalEvent(idx) {
+async function deleteCalEvent(idx) {
   if(!confirm('Delete this event?')) return;
-  evList.splice(idx, 1);
+  const e = evList[idx];
+  if(!e) return;
+  if (dataMode === 'live') {
+    const ok = await deleteEventFromDB(e.id);
+    if (!ok) return;
+  } else {
+    evList.splice(idx, 1);
+  }
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-edit');
   showToast('Event deleted.');
 }
@@ -2988,9 +3859,25 @@ function renderResources() {
     </div>`).join('');
 }
 
-function saveDriveLink() {
+function mapDbResource(r) {
+  return { id: r.id, title: r.title, type: r.type || 'document', url: r.url || '', desc: r.description || '' };
+}
+
+async function loadResourcesFromDB(e) {
+  const { data, error } = await sb.from('resources').select('*').eq('ensemble_id', e.id).order('created_at');
+  if (error) { console.error(error); showToast('Could not load resources: ' + error.message); return; }
+  e.resources = (data || []).map(mapDbResource);
+}
+
+async function saveDriveLink() {
   const url = document.getElementById('drive-url-input').value.trim();
   if(!url) { alert('Please enter a URL.'); return; }
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensembles').update({ drive_url: url }).eq('id', e.id);
+    if (error) { showToast('Could not save Drive link: ' + error.message); return; }
+    e.driveURL = url;
+  }
   driveURL = url;
   const display = document.getElementById('drive-url-display');
   const btn = document.getElementById('drive-link-btn');
@@ -3000,14 +3887,25 @@ function saveDriveLink() {
   showToast('Drive folder linked!');
 }
 
-function saveResource() {
+async function saveResource() {
   const title = document.getElementById('res-title').value.trim();
   const url   = document.getElementById('res-url').value.trim();
   const type  = document.getElementById('res-type').value;
   const desc  = document.getElementById('res-desc').value.trim();
   if(!title) { alert('Please enter a title.'); return; }
   if(!url)   { alert('Please enter a URL.'); return; }
-  resources.push({id: Date.now(), title, type, url, desc});
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('resources').insert({
+      ensemble_id: e.id, title, type, url, description: desc || null,
+    });
+    if (error) { showToast('Could not add resource: ' + error.message); return; }
+    await loadResourcesFromDB(e);
+    loadEnsembleContext();
+  } else {
+    resources.push({id: Date.now(), title, type, url, desc});
+  }
   renderResources();
   closeM('add-resource');
   document.getElementById('res-title').value = '';
@@ -3016,17 +3914,26 @@ function saveResource() {
   showToast('Resource added!');
 }
 
-function deleteResource(id) {
+async function deleteResource(id) {
   if(!confirm('Remove this resource?')) return;
-  resources = resources.filter(r=>r.id!==id);
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('resources').delete().eq('id', id);
+    if (error) { showToast('Could not remove resource: ' + error.message); return; }
+    await loadResourcesFromDB(e);
+    loadEnsembleContext();
+  } else {
+    resources = resources.filter(r=>r.id!==id);
+  }
   renderResources();
 }
 
 /* TODAY COMMAND CENTER */
 
 
-function saveTodayEdit() {
+async function saveTodayEdit() {
   const name   = document.getElementById('te-name').value.trim();
+  const type   = document.getElementById('te-type').value;
   const call   = document.getElementById('te-call').value;
   const start  = document.getElementById('te-start').value;
   const end    = document.getElementById('te-end').value;
@@ -3034,6 +3941,24 @@ function saveTodayEdit() {
   const dress  = document.getElementById('te-dress').value.trim();
   const prog   = document.getElementById('te-program').value.trim();
 
+  if (dataMode === 'live') {
+    const existing = pickTodayEvent();
+    const programPills = prog ? prog.split('\n').map(l=>l.trim()).filter(Boolean) : [];
+    const ok = await upsertEventToDB({
+      name: name || (existing ? existing.n : 'Rehearsal'),
+      type: type || (existing ? existing.type : 'Rehearsal'),
+      eventDate: existing ? existing.eventDate : isoFromDateObj(new Date()),
+      callTime: call, startTime: start, endTime: end, venue, dress,
+      program: programPills, notes: existing ? existing.notes : '',
+    }, existing ? existing.id : undefined);
+    if (!ok) return;
+    await renderTodayCard();
+    closeM('today-edit');
+    showToast('Event updated!');
+    return;
+  }
+
+  // demo mode: unchanged — pokes the (otherwise static) card DOM directly
   if(name)  document.getElementById('today-event-name').textContent = name;
   if(start && end) document.getElementById('today-time').textContent = fmt12(start) + ' – ' + fmt12(end);
   if(venue) document.getElementById('today-venue').textContent = venue;
@@ -3065,6 +3990,199 @@ function saveTodayEdit() {
 
   closeM('today-edit');
   showToast('Event updated!');
+}
+
+function prefillTodayEdit() {
+  const ev = pickTodayEvent();
+  if (!ev) return;
+  document.getElementById('te-name').value = ev.n || '';
+  document.getElementById('te-type').value = ev.type || 'Rehearsal';
+  document.getElementById('te-call').value = ev.callTimeRaw || '';
+  document.getElementById('te-start').value = ev.startTime || '';
+  document.getElementById('te-end').value = ev.endTime || '';
+  document.getElementById('te-venue').value = ev.venue || '';
+  document.getElementById('te-dress').value = ev.dress || '';
+  document.getElementById('te-program').value = (ev.program||[]).join('\n');
+}
+
+// Live mode only — replaces the static "Today's event" HTML (teacher pane)
+// and "Tonight" card (student pane) with the real event pickTodayEvent()
+// resolves to. Demo mode's cards stay exactly as authored; this function
+// no-ops there (see dataMode guard).
+async function renderTodayCard() {
+  if (dataMode !== 'live') return;
+  const ev = pickTodayEvent();
+  await loadRehearsalNotesForEvent(ev);
+
+  const teacherName = document.getElementById('today-event-name');
+  if (teacherName) {
+    teacherName.textContent = ev ? ev.n : 'No event scheduled today';
+    document.getElementById('today-calltime').textContent = ev && ev.callTime ? ev.callTime : '—';
+    document.getElementById('today-time').textContent = ev && ev.t ? ev.t : '—';
+    document.getElementById('today-venue').textContent = ev && ev.venue ? ev.venue : '—';
+    document.getElementById('today-dress').textContent = ev && ev.dress ? ev.dress : '—';
+    const progSection = document.getElementById('today-program-section');
+    if (progSection) {
+      if (ev && ev.program && ev.program.length) {
+        progSection.style.display = '';
+        document.getElementById('today-program').innerHTML = ev.program.map(p =>
+          `<span style="font-size:12px;background:var(--pbg);color:var(--ptx);padding:3px 10px;border-radius:20px">${p}</span>`).join('');
+      } else {
+        progSection.style.display = 'none';
+      }
+    }
+  }
+
+  const stuName = document.getElementById('stu-today-name');
+  if (stuName) {
+    stuName.textContent = ev ? ev.n : 'No event scheduled';
+    document.getElementById('stu-today-call').textContent = ev && ev.callTime ? ev.callTime : '—';
+    document.getElementById('stu-today-time').textContent = ev && ev.t ? ev.t : '—';
+    document.getElementById('stu-today-venue').textContent = ev && ev.venue ? ev.venue : '—';
+    document.getElementById('stu-today-dress').textContent = ev && ev.dress ? ev.dress : '—';
+    const stuProgSection = document.getElementById('stu-today-program-section');
+    if (stuProgSection) {
+      if (ev && ev.program && ev.program.length) {
+        stuProgSection.style.display = '';
+        document.getElementById('stu-today-program').innerHTML = ev.program.map(p =>
+          `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:.5px solid var(--bd)"><i class="ti ti-music" style="color:var(--pu);font-size:14px;flex-shrink:0"></i><div style="font-size:13px;font-weight:500">${p}</div></div>`).join('');
+      } else {
+        stuProgSection.style.display = 'none';
+      }
+    }
+  }
+
+  const teacherPill = document.getElementById('today-geo-pill');
+  if (teacherPill) {
+    teacherPill.innerHTML = ev && ev.geoLat != null
+      ? `<div class="gdot"></div>Geo-fence active · ${ev.geoRadius}m`
+      : `<div class="gdot"></div>No geo-fence set for this event`;
+  }
+  const stuPill = document.getElementById('stu-geo-pill');
+  if (stuPill) {
+    stuPill.innerHTML = ev && ev.geoLat != null
+      ? `<div class="gdot"></div>Geo-fence active · ${ev.geoRadius}m — checked when you check in`
+      : `<div class="gdot"></div>No location restriction for tonight`;
+  }
+
+  renderTodayMetrics();
+  await syncCheckInRing(ev);
+}
+
+function renderTodayMetrics() {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const total = students.length;
+  const present = students.filter(s=>s.s==='present').length;
+  const late    = students.filter(s=>s.s==='late').length;
+  const absent  = students.filter(s=>s.s==='absent').length;
+  set('today-present-ct', present);
+  set('today-present-sub', 'of ' + total + ' students');
+  set('today-late-ct', late);
+  set('today-late-sub', late === 1 ? '1 checked in late' : late + ' checked in late');
+  set('today-absent-ct', absent);
+  set('today-absent-sub', absent ? 'not checked in' : 'none');
+}
+
+// Syncs the student check-in ring to the real attendance row for `ev`
+// (disabling it entirely when there's no event today) — the source of
+// truth after every check-in/out and after each real-time update.
+async function syncCheckInRing(ev) {
+  const ring = document.getElementById('ciring');
+  if (!ring) return;
+  if (!ev) {
+    ring.style.opacity = '.4';
+    ring.style.pointerEvents = 'none';
+    const lbl = document.getElementById('ci-lbl'); if (lbl) lbl.textContent = 'No event today';
+    const tm  = document.getElementById('ci-time'); if (tm) tm.textContent = '';
+    ring.classList.remove('in');
+    return;
+  }
+  ring.style.opacity = '';
+  ring.style.pointerEvents = '';
+  const { data } = await sb.from('attendance').select('*')
+    .eq('event_id', ev.id).eq('user_id', authSession.user.id).maybeSingle();
+  const icon = document.getElementById('ci-icon'), lbl = document.getElementById('ci-lbl'), tm = document.getElementById('ci-time');
+  if (data && data.checkin_at && !data.checkout_at) {
+    ring.classList.add('in'); icon.className = 'ti ti-door-exit';
+    lbl.textContent = 'Checked in — tap to check out';
+    tm.textContent = 'Checked in at ' + new Date(data.checkin_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  } else {
+    ring.classList.remove('in'); icon.className = 'ti ti-door-enter';
+    lbl.textContent = 'Tap to check in';
+    tm.textContent = data && data.checkout_at ? 'Checked out — see you next rehearsal!' : '';
+  }
+}
+
+// Merges real attendance rows for `ev` onto the roster (students[].s/.t),
+// so renderAll()/renderRoster()'s existing bdg(s.s) rendering just works.
+// No event today, or a member with no attendance row, both read as absent.
+async function loadAttendanceForEvent(ev) {
+  if (!ev) { students.forEach(s => { s.s = 'absent'; s.t = '—'; }); return; }
+  const { data, error } = await sb.from('attendance').select('*').eq('event_id', ev.id);
+  if (error) { console.error(error); showToast('Could not load attendance: ' + error.message); return; }
+  const byUser = {};
+  (data || []).forEach(a => { byUser[a.user_id] = a; });
+  students.forEach(s => {
+    const a = s.userId ? byUser[s.userId] : null;
+    s.s = a ? a.status : 'absent';
+    s.t = a && a.checkin_at ? new Date(a.checkin_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+  });
+}
+
+// Teacher-side manual marking: click a today-list row to cycle its status.
+// Only available for members who've signed in at least once (see renderAll()).
+async function cycleAttendance(userId) {
+  const ev = pickTodayEvent();
+  if (!ev) { showToast('No event scheduled today.'); return; }
+  const s = students.find(st => st.userId === userId);
+  if (!s) return;
+  const order = ['present','late','absent'];
+  const next = order[(order.indexOf(s.s)+1) % order.length];
+  const payload = { event_id: ev.id, user_id: userId, ensemble_id: activeEns().id, status: next };
+  if (next === 'absent') { payload.checkin_at = null; payload.checkout_at = null; }
+  else payload.checkin_at = new Date().toISOString();
+  const { error } = await sb.from('attendance').upsert(payload, { onConflict: 'event_id,user_id' });
+  if (error) { showToast('Could not update attendance: ' + error.message); return; }
+  s.s = next;
+  s.t = next === 'absent' ? '—' : new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  renderAll();
+  renderTodayMetrics();
+  if (next === 'absent') maybeSendAbsenceNotice(s, ev); // fire-and-forget — never blocks the UI on email delivery
+}
+
+// Substitutes the {{...}} tokens from the template editor (see `tokens`)
+// with real values for `student`/`ev`, using the active ensemble's own
+// name/teacher/grading policy rather than the editor's static preview data.
+function renderTemplateTokens(text, student, ev) {
+  const e = activeEns();
+  const values = {
+    '{{student_name}}': student.n || '',
+    '{{event_name}}': ev ? ev.n : '',
+    '{{event_date}}': ev ? ev.d : '',
+    '{{absence_count}}': String(student.a||0),
+    '{{absences_remaining}}': String(Math.max(0, pol.fail - (student.a||0))),
+    '{{excuse_deadline}}': ev && ev.dateObj ? new Date(ev.dateObj.getTime() + (e?._excWindow||48)*3600000).toLocaleDateString() : '',
+    '{{production_name}}': e ? e.name : '',
+    '{{teacher_name}}': e ? e.teacher : '',
+    '{{teacher_email}}': e ? e.email : '',
+  };
+  let out = text || '';
+  Object.entries(values).forEach(([k,v]) => { out = out.split(k).join(v); });
+  return out;
+}
+
+// Fires the "Absence notice" rule the moment a student is marked absent —
+// the only trigger from the Settings > Notifications rules this build
+// wires automatically. 'after_absence' (crossing the free-absence count)
+// and 'before_event' (a scheduled reminder) both need something to run on
+// a timer independent of any user action — a Vercel cron job or Supabase
+// Edge Function — which this project doesn't have; see supabase/README.md.
+async function maybeSendAbsenceNotice(student, ev) {
+  if (!student.e) return;
+  const rule = rules.find(r => r.on && r.trig === 'end_of_event' && r.tpl && tpls[r.tpl]);
+  if (!rule) return;
+  const tpl = tpls[rule.tpl];
+  await sendEmail(student.e, renderTemplateTokens(tpl.s, student, ev), renderTemplateTokens(tpl.b, student, ev));
 }
 
 
@@ -3125,7 +4243,9 @@ function parseCalCSVLine(headers, values) {
     dress: row.dress || '',
     program: programPills,
     notes: row.notes || '',
-    dateObj: d
+    dateObj: d,
+    startTimeRaw: row.start_time || '',
+    endTimeRaw: row.end_time || '',
   };
 }
 
@@ -3177,19 +4297,40 @@ function handleCalCSV(input) {
   reader.readAsText(file);
 }
 
-function importCalCSV() {
+async function importCalCSV() {
   if(!parsedCalEvents.length) return;
   const replace = document.getElementById('cal-csv-replace').checked;
-  if(replace) {
-    evList.length = 0;
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    if (replace) {
+      const { error: delErr } = await sb.from('events').delete().eq('ensemble_id', e.id);
+      if (delErr) { showToast('Could not clear calendar: ' + delErr.message); return; }
+    }
+    const rows = parsedCalEvents.map(ev => ({
+      ensemble_id: e.id, name: ev.n, type: ev.type, event_date: isoFromDateObj(ev.dateObj),
+      call_time: normalizeTimeTo24h(ev.callTime) || null,
+      start_time: normalizeTimeTo24h(ev.startTimeRaw) || null,
+      end_time: normalizeTimeTo24h(ev.endTimeRaw) || null,
+      venue: ev.venue || null, dress: ev.dress || null,
+      program: ev.program && ev.program.length ? ev.program : null, notes: ev.notes || null,
+    }));
+    const { error } = await sb.from('events').insert(rows);
+    if (error) { showToast('Import failed: ' + error.message); return; }
+    await loadEventsFromDB(e);
+    loadEnsembleContext();
+  } else {
+    if(replace) evList.length = 0;
+    evList.push(...parsedCalEvents.map(ev => ({
+      n: ev.n, d: ev.d, t: ev.t, type: ev.type, dot: ev.dot,
+      venue: ev.venue, callTime: ev.callTime, dress: ev.dress,
+      program: ev.program, notes: ev.notes, dateObj: ev.dateObj
+    })));
+    evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
   }
-  evList.push(...parsedCalEvents.map(ev => ({
-    n: ev.n, d: ev.d, t: ev.t, type: ev.type, dot: ev.dot,
-    venue: ev.venue, callTime: ev.callTime, dress: ev.dress,
-    program: ev.program, notes: ev.notes, dateObj: ev.dateObj
-  })));
-  evList.sort((a,b) => (a.dateObj||0) - (b.dateObj||0));
+
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   closeM('cal-import');
   // Reset
   document.getElementById('cal-csv-zone').classList.remove('ok');
@@ -3209,10 +4350,19 @@ function filterCal(btn) {
   renderCal();
 }
 
-function clearCalendar() {
+async function clearCalendar() {
   if(!confirm('Clear all events from the calendar?')) return;
-  evList.length = 0;
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('events').delete().eq('ensemble_id', e.id);
+    if (error) { showToast('Could not clear calendar: ' + error.message); return; }
+    e.evList = [];
+    loadEnsembleContext();
+  } else {
+    evList.length = 0;
+  }
   renderCal();
+  if (dataMode === 'live') await renderTodayCard();
   showToast('Calendar cleared.');
 }
 
@@ -3276,7 +4426,10 @@ function renderStuSchedule() {
 function renderStuExcuses() {
   const el = document.getElementById('stu-excuses-list');
   if(!el) return;
-  const mine = excuses.filter(e => e.stu === 'Jordan Martinez');
+  // Live mode: RLS already restricts `excuses` to the signed-in student's
+  // own rows, so no name filter is needed (and ex.stu is now their real
+  // name, not always 'Jordan Martinez').
+  const mine = dataMode === 'live' ? excuses : excuses.filter(e => e.stu === 'Jordan Martinez');
   if(!mine.length) {
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">No excuse requests yet.</div>';
     return;
@@ -3343,7 +4496,7 @@ const ensembleDefaults = () => ({
   logData: [],
   resources: [],
   driveURL: '',
-  pol: {free:2, fail:4, ded:5, tardy:3},
+  pol: {free:2, fail:4, ded:5, tardy:3, excludeExcused:true},
   rules: [
     {id:1,on:true, lbl:'Absence notice',     trig:'end_of_event',  off:0,unit:'min',tpl:'absence'},
     {id:2,on:true, lbl:'Absence warning',    trig:'after_absence', off:0,unit:'min',tpl:'warning'},
@@ -3353,10 +4506,12 @@ const ensembleDefaults = () => ({
   calFilter: 'all',
   reportSort: {key:'absent', dir:-1},
   color: '#534AB7',
-  joinRequests: [], // {name, initials, email, role, status:'pending'|'approved'|'denied'}
 });
 
-let ensembles = [
+// Seed data for "Skip for now (demo mode)" — never touches Supabase.
+// Live-mode ensembles are loaded from the DB into `ensembles` instead;
+// see loadEnsemblesFromDB() in the SUPABASE CLIENT + AUTH block above.
+const DEMO_ENSEMBLES = [
   {
     id: 1,
     name: 'Cardinal Voices',
@@ -3404,9 +4559,476 @@ let ensembles = [
   },
 ];
 
+let dataMode = 'demo'; // 'demo' (DEMO_ENSEMBLES, no network) | 'live' (Supabase-backed)
+let ensembles = DEMO_ENSEMBLES;
 let activeEnsIdx = 0;
 
 function activeEns() { return ensembles[activeEnsIdx]; }
+
+// In live mode `ensembles` holds every ensemble in the system (any signed-in
+// user's invite link has to resolve); teacher-facing UI (landing cards, the
+// ensemble switcher) should only ever list the ones this signed-in user
+// actually teaches, and — by default — isn't archived.
+function teacherEnsembles() {
+  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher' && !e.archivedAt) : ensembles;
+}
+
+function archivedTeacherEnsembles() {
+  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher' && e.archivedAt) : [];
+}
+
+/* ═══════════════════════════════════════════
+   ENSEMBLE / ROSTER DATA LAYER (live mode)
+═══════════════════════════════════════════ */
+
+function initialsFromName(name) {
+  return (name || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+}
+
+function nameFromEmail(email) {
+  const local = (email || '').split('@')[0].replace(/[._]+/g, ' ').trim();
+  if (!local) return email || 'Unnamed';
+  return local.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Maps a DB `ensembles` row (+ the current user's own ensemble_members row,
+// if any) into the shape every render function in this file already
+// expects. `students` stays unpopulated here — that comes from the roster
+// query in loadRosterFromDB(), run when a teacher opens the ensemble (full
+// roster) since RLS only lets a student see their own membership row,
+// never their classmates'.
+function mapDbEnsemble(dbEns, myMembership) {
+  // Self-heal: if this account created the ensemble but has no matching
+  // "teacher" row (e.g. that insert failed at creation time — see
+  // finishWizard()'s memErr toast — or the row got deleted some other
+  // way), still recognize it as theirs. loadEnsemblesFromDB() backfills
+  // the actual row once this fires, so it's a one-time repair.
+  const isOwnerWithoutRow = !myMembership && dbEns.created_by && authSession?.user?.id === dbEns.created_by;
+  const isMyActiveEnrollment = myMembership && myMembership.role === 'student' && myMembership.status === 'active';
+  return {
+    ...ensembleDefaults(),
+    id: dbEns.id,
+    name: dbEns.name,
+    sub: dbEns.sub || '',
+    term: dbEns.term || '',
+    teacher: dbEns.teacher_name || '',
+    email: dbEns.teacher_email || '',
+    color: dbEns.color || '#534AB7',
+    desc: dbEns.description || '',
+    schedule: dbEns.schedule || '',
+    driveURL: dbEns.drive_url || '',
+    tz: dbEns.tz || 'America/Chicago',
+    createdBy: dbEns.created_by,
+    archivedAt: dbEns.archived_at || null,
+    myRole: myMembership ? myMembership.role : (isOwnerWithoutRow ? 'teacher' : null),
+    myStatus: myMembership ? myMembership.status : (isOwnerWithoutRow ? 'active' : null),
+    students: [],
+    enrolledStudentEmails: isMyActiveEnrollment ? [currentStudent.email] : [],
+  };
+}
+
+function mapMemberToStudent(m, absenceCount, excusedCount, presentCount) {
+  const name = m.name || nameFromEmail(m.email);
+  return { n: name, i: initialsFromName(name), r: m.part || 'Ensemble', e: m.email || '', s: 'absent', t: '—',
+    a: absenceCount || 0, aExcused: excusedCount || 0, aPresent: presentCount || 0, memberId: m.id, userId: m.user_id };
+}
+
+// The number of absences that actually count against the free-absence/
+// failing thresholds and grade deduction — total absences minus approved-
+// excuse absences, when the policy excludes those (the default; see the
+// wizard's "Excused absences" step / Settings > Grading). s.aExcused is
+// only ever populated in live mode (loadRosterFromDB()); demo-mode
+// students don't have it, so this is just s.a there regardless of the
+// toggle — no observable change to demo mode.
+function gradedAbsences(s) {
+  return pol.excludeExcused ? Math.max(0, (s.a||0) - (s.aExcused||0)) : (s.a||0);
+}
+
+// Points-pool model (gradeModel==='points'): deduct mode starts everyone at
+// pointsTotal and takes pointsPerEvent for each graded absence (same
+// excused-absence rule as the pct model, via gradedAbsences()); earn mode
+// starts at 0 and credits pointsPerEvent for each rehearsal actually
+// attended (present or late), capped at pointsTotal — an excused absence
+// just isn't a rehearsal attended, so it costs nothing there without any
+// special-casing. s.aPresent is only populated in live mode
+// (loadRosterFromDB()); demo mode has no concept of a per-student present
+// count, so this only produces a meaningful number in live mode.
+function pointsBalance(s) {
+  return pointsMode === 'earn'
+    ? Math.min(pointsTotal, (s.aPresent||0) * pointsPerEvent)
+    : Math.max(0, pointsTotal - gradedAbsences(s) * pointsPerEvent);
+}
+
+// Full roster for the ensemble the teacher is currently in — every member
+// row, not just the signed-in user's own (RLS allows this for teachers only).
+// Absence counts come from real attendance rows, not a stored counter
+// (ensemble_members.absences is never written to — deriving it here means
+// it can never drift out of sync with what actually happened at check-in).
+async function loadRosterFromDB(e) {
+  const [membersRes, absenceRes, excusedRes, presentRes] = await Promise.all([
+    sb.from('ensemble_members').select('*').eq('ensemble_id', e.id),
+    sb.from('attendance').select('user_id').eq('ensemble_id', e.id).eq('status', 'absent'),
+    // Approved-excuse count per student — feeds gradedAbsences() below when
+    // the policy excludes excused absences from the grade math.
+    sb.from('excuses').select('user_id').eq('ensemble_id', e.id).eq('status', 'approved'),
+    // Rehearsals actually attended — feeds pointsBalance() in "earn" mode.
+    sb.from('attendance').select('user_id').eq('ensemble_id', e.id).in('status', ['present', 'late']),
+  ]);
+  if (membersRes.error) { console.error(membersRes.error); showToast('Could not load roster: ' + membersRes.error.message); return; }
+  const rows = membersRes.data || [];
+  const absenceCounts = {};
+  (absenceRes.data || []).forEach(a => { absenceCounts[a.user_id] = (absenceCounts[a.user_id]||0) + 1; });
+  const excusedCounts = {};
+  (excusedRes.data || []).forEach(x => { excusedCounts[x.user_id] = (excusedCounts[x.user_id]||0) + 1; });
+  const presentCounts = {};
+  (presentRes.data || []).forEach(p => { presentCounts[p.user_id] = (presentCounts[p.user_id]||0) + 1; });
+  e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
+    .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0, m.user_id ? presentCounts[m.user_id] : 0));
+}
+
+// Every ensemble in the system (RLS lets any signed-in user read the
+// `ensembles` table, since an invite link — see handleJoinDeepLink() — has
+// to be resolvable by whoever opens it) plus the signed-in user's own
+// membership rows, so we know which ones they teach/are enrolled in
+// without a per-ensemble round trip.
+async function loadEnsemblesFromDB() {
+  const uid = authSession.user.id;
+  const [ensRes, myRes, studentCountRes] = await Promise.all([
+    sb.from('ensembles').select('*').order('created_at'),
+    sb.from('ensemble_members').select('*').eq('user_id', uid),
+    sb.from('ensemble_members').select('ensemble_id').eq('role', 'student').eq('status', 'active'),
+  ]);
+  if (ensRes.error || myRes.error) {
+    console.error(ensRes.error || myRes.error);
+    showToast('Could not load ensembles: ' + (ensRes.error || myRes.error).message);
+    ensembles = [];
+    activeEnsIdx = 0;
+    return;
+  }
+  const countByEns = {};
+  (studentCountRes.data || []).forEach(r => { countByEns[r.ensemble_id] = (countByEns[r.ensemble_id] || 0) + 1; });
+  const myRows = myRes.data || [];
+  ensembles = (ensRes.data || []).map(dbEns => {
+    const ens = mapDbEnsemble(dbEns, myRows.find(m => m.ensemble_id === dbEns.id));
+    ens.studentCount = countByEns[dbEns.id] || 0;
+    return ens;
+  });
+  activeEnsIdx = 0;
+
+  // Backfill any ensemble mapDbEnsemble() recognized via the created_by
+  // self-heal (myRole set without a real myMembership row) — repairs the
+  // actual DB gap instead of just working around it on every load. Not
+  // awaited on the critical path; if it fails, next sign-in tries again.
+  const orphaned = ensembles.filter(e => e.myRole === 'teacher' && !myRows.some(m => m.ensemble_id === e.id));
+  if (orphaned.length) {
+    sb.from('ensemble_members').insert(
+      orphaned.map(e => ({ ensemble_id: e.id, user_id: uid, role: 'teacher', status: 'active' }))
+    ).then(({ error }) => { if (error) console.error('teacher row backfill failed', error); });
+  }
+}
+
+/* ═══════════════════════════════════════════
+   EVENTS + ATTENDANCE DATA LAYER (live mode)
+═══════════════════════════════════════════ */
+
+function isoFromDateObj(d) {
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function dispDateFromISO(iso) {
+  const d = new Date(iso + 'T00:00');
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return dayNames[d.getDay()] + ' ' + monNames[d.getMonth()] + ' ' + d.getDate();
+}
+
+// Accepts "7:00 pm" / "7:00 PM" / "19:00" and returns 24h "HH:MM" (or '' if
+// unparseable). Needed because the calendar-edit modal (ce-*) and CSV import
+// both hold times as free-text 12h strings, but events.call_time/start_time/
+// end_time are stored as plain 24h text for fmt12() to read back reliably.
+function normalizeTimeTo24h(str) {
+  if (!str) return '';
+  const s = str.trim();
+  const ampm = s.match(/^(\d{1,2}):?(\d{2})?\s*([ap]m)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const min = ampm[2] || '00';
+    const suf = ampm[3].toLowerCase();
+    if (suf === 'pm' && h !== 12) h += 12;
+    if (suf === 'am' && h === 12) h = 0;
+    return String(h).padStart(2,'0') + ':' + min;
+  }
+  const hm = s.match(/^(\d{1,2}):(\d{2})$/);
+  return hm ? String(parseInt(hm[1],10)).padStart(2,'0') + ':' + hm[2] : '';
+}
+
+// Maps a DB `events` row into the shape renderCal()/renderStuSchedule()/
+// openCalEdit() already expect (see DEMO_ENSEMBLES/saveEvent() for the same
+// shape built by hand). startTime/endTime/callTimeRaw (24h) are kept
+// alongside the 12h display strings for prefilling <input type="time">
+// fields (the "Today's event" edit modal) without re-parsing "7:00 pm".
+function mapDbEvent(dbEv) {
+  return {
+    id: dbEv.id,
+    n: dbEv.name,
+    d: dispDateFromISO(dbEv.event_date),
+    t: dbEv.start_time && dbEv.end_time ? fmt12(dbEv.start_time) + '–' + fmt12(dbEv.end_time)
+       : dbEv.start_time ? fmt12(dbEv.start_time) : '',
+    type: dbEv.type || 'Rehearsal',
+    dot: typeDotMap[(dbEv.type||'').toLowerCase()] || 'ep',
+    venue: dbEv.venue || '',
+    callTime: dbEv.call_time ? fmt12(dbEv.call_time) : '',
+    dress: dbEv.dress || '',
+    program: dbEv.program || [],
+    notes: dbEv.notes || '',
+    dateObj: new Date(dbEv.event_date + 'T00:00'),
+    eventDate: dbEv.event_date,
+    startTime: dbEv.start_time || '',
+    endTime: dbEv.end_time || '',
+    callTimeRaw: dbEv.call_time || '',
+    geoLat: dbEv.geo_lat ?? null,
+    geoLng: dbEv.geo_lng ?? null,
+    geoRadius: dbEv.geo_radius || 50,
+  };
+}
+
+async function loadEventsFromDB(e) {
+  const { data, error } = await sb.from('events').select('*').eq('ensemble_id', e.id).order('event_date');
+  if (error) { console.error(error); showToast('Could not load events: ' + error.message); return; }
+  e.evList = (data || []).map(mapDbEvent);
+}
+
+// Shared by saveEvent()/saveCalEdit()/importCalCSV in live mode: upserts one
+// events row from the canonical field set, then reloads e.evList so every
+// reader (renderCal, renderTodayCard, renderStuSchedule) sees the real row
+// — including its DB-assigned id — instead of an optimistic local guess.
+async function upsertEventToDB(fields, existingId) {
+  const e = activeEns();
+  const payload = {
+    ensemble_id: e.id,
+    name: fields.name,
+    type: fields.type || 'Rehearsal',
+    event_date: fields.eventDate,
+    call_time: fields.callTime || null,
+    start_time: fields.startTime || null,
+    end_time: fields.endTime || null,
+    venue: fields.venue || null,
+    dress: fields.dress || null,
+    program: fields.program && fields.program.length ? fields.program : null,
+    notes: fields.notes || null,
+    geo_lat: fields.geoLat ?? null,
+    geo_lng: fields.geoLng ?? null,
+    geo_radius: fields.geoRadius || 50,
+  };
+  const { error } = existingId
+    ? await sb.from('events').update(payload).eq('id', existingId)
+    : await sb.from('events').insert(payload);
+  if (error) { showToast('Could not save event: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+// Expands the New Event modal's recurrence controls into real dates.
+// Presets with no end-date UI at all (weekly/monwed/mwf) are capped at a
+// full semester (16 weeks); "custom" with "never" as its end condition is
+// capped at 52 occurrences instead — a count, not a week span, since a
+// custom recurrence's interval/unit can be anything (every day, every 3
+// months, ...) and "16 weeks" isn't a meaningful bound for all of those.
+// Both are just guardrails against an unbounded insert, not a real "ends
+// never" feature.
+const SEMESTER_WEEKS = 16;
+
+function computeRecurrenceDates(startDate, recurSel) {
+  if (recurSel === 'none' || !recurSel) return [startDate];
+
+  if (recurSel === 'weekly') {
+    const dates = [];
+    for (let i = 0; i < SEMESTER_WEEKS; i++) dates.push(new Date(startDate.getTime() + i*7*86400000));
+    return dates;
+  }
+
+  if (recurSel === 'monwed' || recurSel === 'mwf') {
+    const wantDays = recurSel === 'monwed' ? [1,3] : [1,3,5];
+    const dates = [];
+    let d = new Date(startDate);
+    const endBound = new Date(startDate.getTime() + SEMESTER_WEEKS*7*86400000);
+    while (d <= endBound) {
+      if (wantDays.includes(d.getDay())) dates.push(new Date(d));
+      d = new Date(d.getTime() + 86400000);
+    }
+    return dates;
+  }
+
+  if (recurSel === 'custom') {
+    const wantDays = Array.from(document.querySelectorAll('#recur-days .chip.on')).map(b => b.dataset.d);
+    const dayIndex = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+    const wantIdx = wantDays.map(d => dayIndex[d]).filter(n => n !== undefined);
+    const every = parseInt(document.getElementById('recur-every').value) || 1;
+    const unit = document.getElementById('recur-unit').value;
+    const endMode = document.querySelector('input[name="recur-end"]:checked')?.value || 'never';
+    const endDateVal = document.getElementById('recur-end-date').value;
+    const endDate = endDateVal ? new Date(endDateVal + 'T00:00') : null;
+    const endCount = parseInt(document.getElementById('recur-end-count').value) || 10;
+    const maxOccurrences = endMode === 'count' ? endCount : 52;
+
+    const dates = [];
+    if (wantIdx.length === 0) {
+      // No specific weekday picked — repeat the start date's own weekday
+      // every `every` unit(s).
+      let d = new Date(startDate);
+      while (dates.length < maxOccurrences) {
+        if (endMode === 'date' && endDate && d > endDate) break;
+        dates.push(new Date(d));
+        if (unit === 'day') d = new Date(d.getTime() + every*86400000);
+        else if (unit === 'month') { const nd = new Date(d); nd.setMonth(nd.getMonth()+every); d = nd; }
+        else d = new Date(d.getTime() + every*7*86400000);
+      }
+    } else {
+      // Specific weekdays picked — walk day by day (the `every`/`unit`
+      // interval fields only apply to the no-specific-days case above,
+      // matching how the modal groups them visually).
+      let d = new Date(startDate);
+      let scanned = 0;
+      while (dates.length < maxOccurrences && scanned < 366) {
+        if (endMode === 'date' && endDate && d > endDate) break;
+        if (wantIdx.includes(d.getDay())) dates.push(new Date(d));
+        d = new Date(d.getTime() + 86400000);
+        scanned++;
+      }
+    }
+    return dates;
+  }
+
+  return [startDate];
+}
+
+// Bulk insert for computeRecurrenceDates()'s output — one events row per
+// date, all sharing the same name/time/venue/etc.
+async function insertRecurringEvents(fields, dates) {
+  const e = activeEns();
+  const rows = dates.map(d => ({
+    ensemble_id: e.id,
+    name: fields.name,
+    type: fields.type || 'Rehearsal',
+    event_date: isoFromDateObj(d),
+    call_time: fields.callTime || null,
+    start_time: fields.startTime || null,
+    end_time: fields.endTime || null,
+    venue: fields.venue || null,
+    dress: fields.dress || null,
+    program: fields.program && fields.program.length ? fields.program : null,
+    notes: fields.notes || null,
+    geo_lat: fields.geoLat ?? null,
+    geo_lng: fields.geoLng ?? null,
+    geo_radius: fields.geoRadius || 50,
+  }));
+  const { error } = await sb.from('events').insert(rows);
+  if (error) { showToast('Could not save events: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+async function deleteEventFromDB(id) {
+  const e = activeEns();
+  const { error } = await sb.from('events').delete().eq('id', id);
+  if (error) { showToast('Could not delete event: ' + error.message); return false; }
+  await loadEventsFromDB(e);
+  loadEnsembleContext();
+  return true;
+}
+
+// Today's event for the active (live) ensemble: the one dated today if any,
+// else the soonest upcoming one. Returns null if nothing's scheduled from
+// today onward. Demo mode never calls this — its seed dates are fixed in
+// the past and its "Today's event" card is deliberately left untouched
+// (see renderTodayCard()).
+function pickTodayEvent() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = evList
+    .filter(e => e.dateObj && e.dateObj.getTime() >= today.getTime())
+    .sort((a,b) => a.dateObj - b.dateObj);
+  return upcoming[0] || null;
+}
+
+/* ═══════════════════════════════════════════
+   GEOLOCATION (Phase 4)
+═══════════════════════════════════════════ */
+
+// {lat,lng} most recently captured in the New/Edit event modal, keyed by
+// modal field prefix ('ev' or 'ce'). Cleared after each save.
+let pendingEventGeo = { ev: null, ce: null };
+
+function captureEventGeo(prefix) {
+  const statusEl = document.getElementById(prefix + '-geo-status');
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.textContent = 'Geolocation is not available in this browser.';
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      pendingEventGeo[prefix] = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (statusEl) statusEl.textContent = 'Location set — check-in will be restricted to the radius above.';
+    },
+    () => { if (statusEl) statusEl.textContent = 'Could not get your location — check-in will not be location-restricted.'; },
+    { timeout: 8000 }
+  );
+}
+
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Resolves {ok, distance}. Fails open (ok:true, no distance) whenever the
+// event has no fence configured, geolocation isn't available, or the
+// browser denies/times out the request — a GPS hiccup should never be
+// what stops a student from checking in.
+function checkGeoFence(ev) {
+  return new Promise(resolve => {
+    if (!ev || ev.geoLat == null || ev.geoLng == null) { resolve({ ok: true }); return; }
+    if (!navigator.geolocation) { resolve({ ok: true }); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const dist = getDistanceMeters(pos.coords.latitude, pos.coords.longitude, ev.geoLat, ev.geoLng);
+        resolve({ ok: dist <= (ev.geoRadius || 50), distance: Math.round(dist) });
+      },
+      () => resolve({ ok: true }),
+      { timeout: 8000 }
+    );
+  });
+}
+
+// Live-mode "impressive but optional" real-time (spec §2.3): the teacher's
+// Today view updates as students check in, without a refresh. Requires
+// migration 0004 (attendance added to the supabase_realtime publication).
+let attendanceChannel = null;
+
+function subscribeAttendanceRealtime(ensembleId) {
+  unsubscribeAttendanceRealtime();
+  attendanceChannel = sb.channel('attendance-' + ensembleId)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'attendance', filter: `ensemble_id=eq.${ensembleId}` },
+      async (payload) => {
+        const ev = pickTodayEvent();
+        const row = payload.new || payload.old;
+        if (!ev || !row || row.event_id !== ev.id) return;
+        await loadAttendanceForEvent(ev);
+        renderAll();
+        renderTodayMetrics();
+      })
+    .subscribe();
+}
+
+function unsubscribeAttendanceRealtime() {
+  if (attendanceChannel) { sb.removeChannel(attendanceChannel); attendanceChannel = null; }
+}
 
 function loadEnsembleContext() {
   const e = activeEns();
@@ -3417,10 +5039,16 @@ function loadEnsembleContext() {
   logData.length = 0;  logData.push(...(e.logData||[]));
   resources.length = 0; resources.push(...(e.resources||[]));
   driveURL = e.driveURL || '';
-  pol = {...(e.pol || {free:2,fail:4,ded:5,tardy:3})};
+  pol = {...(e.pol || {free:2,fail:4,ded:5,tardy:3,excludeExcused:true})};
   rules = JSON.parse(JSON.stringify(e.rules || []));
   tpls = JSON.parse(JSON.stringify(e.tpls || defTpls));
+  customTpls = JSON.parse(JSON.stringify(e.customTpls || {}));
   calFilter = e.calFilter || 'all';
+  gradeModel = e.gradeModel || 'pct';
+  letterRules = JSON.parse(JSON.stringify(e.letterRules || [{id:1, absences:3, drop:1}, {id:2, absences:5, drop:1}]));
+  pointsTotal = e.pointsTotal ?? 1000;
+  pointsPerEvent = e.pointsPerEvent ?? 5;
+  pointsMode = e.pointsMode || 'deduct';
 }
 
 function saveEnsembleContext() {
@@ -3434,11 +5062,28 @@ function saveEnsembleContext() {
   e.pol       = {...pol};
   e.rules     = JSON.parse(JSON.stringify(rules));
   e.tpls      = JSON.parse(JSON.stringify(tpls));
+  e.customTpls = JSON.parse(JSON.stringify(customTpls));
   e.calFilter = calFilter;
+  e.gradeModel = gradeModel;
+  e.letterRules = JSON.parse(JSON.stringify(letterRules));
+  e.pointsTotal = pointsTotal;
+  e.pointsPerEvent = pointsPerEvent;
+  e.pointsMode = pointsMode;
 }
 
 let landingRole = 'teacher';
 let lastRole = 'teacher'; // tracks whether user entered as teacher or student
+
+// Whether this account should see the Teacher/Student toggle (and the
+// "Create Ensemble" affordance) on the landing page at all. A brand-new
+// student who picked "Student" at sign-in has no business seeing teacher
+// tools; but an account that actually teaches something — or that picked
+// "Teacher" at sign-in, since that's how a first-time teacher gets to
+// "Create Ensemble" — still needs it. Demo mode always shows both, since
+// it's for exploring the whole app rather than a real single-role account.
+function canTeach() {
+  return dataMode !== 'live' || loginRole === 'teacher' || ensembles.some(e => e.myRole === 'teacher');
+}
 
 function setLandingRole(role, btn, skipAutoEnter) {
   landingRole = role;
@@ -3453,18 +5098,43 @@ function setLandingRole(role, btn, skipAutoEnter) {
 }
 
 function renderLanding() {
-  // Teacher cards
   const el = document.getElementById('ensemble-cards');
-  if(el) el.innerHTML = ensembles.map((e,i) => `
-    <div class="ens-card" onclick="enterEnsemble(${i})">
-      <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700;color:var(--tx)">${e.name}</div>
-        <div style="font-size:12px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${(e.students||[]).length} students</div>
-      </div>
-      <i class="ti ti-chevron-right" style="color:var(--t3);font-size:18px"></i>
-    </div>`).join('');
+  if(!el) return;
+  const list = teacherEnsembles();
+  if(dataMode === 'live' && list.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You don\'t teach any ensembles yet.<br>Create one below to get started.</div>';
+  } else {
+    el.innerHTML = list.map(e => { const i = ensembles.indexOf(e); const count = dataMode === 'live' ? (e.studentCount||0) : (e.students||[]).length; return `
+      <div class="ens-card" onclick="enterEnsemble(${i})">
+        <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:var(--tx)">${e.name}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${count} students</div>
+        </div>
+        <i class="ti ti-chevron-right" style="color:var(--t3);font-size:18px"></i>
+      </div>`; }).join('');
+  }
+
+  // Archived ensembles get a separate, visually de-emphasized list further
+  // down the landing page rather than a hidden view — clicking one still
+  // opens it normally (Settings > General has the "Unarchive" action).
+  const elArch = document.getElementById('archived-ensembles');
+  if(elArch) {
+    const archived = archivedTeacherEnsembles();
+    elArch.innerHTML = archived.length ? `
+      <div class="slbl">Archived</div>
+      ${archived.map(e => { const i = ensembles.indexOf(e); return `
+        <div class="ens-card" style="opacity:.55" onclick="enterEnsemble(${i})">
+          <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--tx)">${e.name}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
+          </div>
+          <span class="badge bg">Archived</span>
+        </div>`; }).join('')}
+    ` : '';
+  }
 }
 
 function renderStudentLanding(skipAutoEnter) {
@@ -3483,7 +5153,7 @@ function renderStudentLanding(skipAutoEnter) {
   const elEnr = document.getElementById('student-ensemble-cards');
   if(elEnr) {
     if(enrolled.length === 0) {
-      elEnr.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You are not enrolled in any ensembles yet.<br>Request to join one below.</div>';
+      elEnr.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You\'re not in any ensembles yet.<br>Ask your director for an invite link to join one.</div>';
     } else {
       elEnr.innerHTML = enrolled.map(e => {
         const i = ensembles.indexOf(e);
@@ -3499,65 +5169,71 @@ function renderStudentLanding(skipAutoEnter) {
       }).join('');
     }
   }
+}
 
-  // Show ALL ensembles in join section so student can see what's available
-  const elJoin = document.getElementById('join-request-cards');
-  if(elJoin) {
-    if(ensembles.length === 0) {
-      elJoin.innerHTML = '<div style="font-size:13px;color:var(--t3);padding:8px 0">No ensembles available yet.</div>';
-    } else {
-      elJoin.innerHTML = ensembles.map(e => {
-        const i = ensembles.indexOf(e);
-        const isEnrolled = enrolled.includes(e);
-        const req = (e.joinRequests||[]).find(r => r.email === currentStudent.email);
-        let actionBtn = '';
-        if(isEnrolled) {
-          actionBtn = '<span class="badge bg">Enrolled</span>';
-        } else if(!req) {
-          actionBtn = `<button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="event.stopPropagation();requestJoin(${i})"><i class="ti ti-send"></i>Request to join</button>`;
-        } else if(req.status === 'pending') {
-          actionBtn = '<span class="badge bpend">Request pending</span>';
-        } else if(req.status === 'denied') {
-          actionBtn = '<span class="badge bunexc">Not approved</span>';
-        }
-        return `<div style="background:var(--sf);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px">
-          <div class="ens-icon" style="background:${e.color};width:36px;height:36px;font-size:16px"><i class="ti ti-music"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600">${e.name}</div>
-            <div style="font-size:11px;color:var(--t2)">${e.sub||''} · ${e.term||''}</div>
-          </div>
-          ${actionBtn}
-        </div>`;
-      }).join('');
-    }
+// Reflects currentStudent + the active ensemble on the student topbar —
+// called whenever a student enters an ensemble and right after
+// saveEditName() changes their name.
+function syncStudentHeader(e) {
+  const av = document.getElementById('stu-avatar');
+  const nameEl = document.getElementById('stu-name-display');
+  const roleEl = document.getElementById('stu-role-line');
+  if (av) av.textContent = currentStudent.initials;
+  if (nameEl) nameEl.textContent = currentStudent.name;
+  if (roleEl) roleEl.textContent = e ? e.name : '';
+}
+
+function openEditName() {
+  const input = document.getElementById('edit-name-input');
+  if (input) input.value = currentStudent.name;
+  openM('edit-name');
+}
+
+// Fixes a name that got auto-derived from an email address (see
+// nameFromEmail()) — e.g. joining via invite link before the login
+// screen's name field existed. Updates the signed-in account's own name
+// everywhere it's stored: Supabase auth (so future sign-ins keep it) and
+// every one of this user's *student* rows (so every teacher's roster
+// picks it up) — deliberately excludes any row where they're a teacher,
+// since migration 0013's RLS policy only allows self-updates that keep
+// role='student', and touching a teacher row in the same statement would
+// fail that check and abort the whole update.
+async function saveEditName() {
+  const input = document.getElementById('edit-name-input');
+  const name = input.value.trim();
+  if (!name) { input.style.borderColor = 'rgba(226,75,74,.8)'; return; }
+  input.style.borderColor = '';
+  currentStudent.name = name;
+  currentStudent.initials = initialsFromName(name);
+  if (dataMode === 'live') {
+    await sb.auth.updateUser({ data: { name } });
+    const { error } = await sb.from('ensemble_members').update({ name })
+      .eq('user_id', authSession.user.id).eq('role', 'student');
+    if (error) { showToast('Could not save: ' + error.message); return; }
   }
+  syncStudentHeader(activeEns());
+  closeM('edit-name');
+  showToast('Name updated!');
 }
 
-function requestJoin(ensIdx) {
-  const e = ensembles[ensIdx];
-  if(!e.joinRequests) e.joinRequests = [];
-  e.joinRequests.push({
-    name: currentStudent.name,
-    initials: currentStudent.initials,
-    email: currentStudent.email,
-    role: '',
-    status: 'pending',
-  });
-  renderStudentLanding();
-  showToast('Join request sent to ' + e.name + '!');
-}
-
-function enterEnsembleAsStudent(idx) {
+async function enterEnsembleAsStudent(idx) {
   lastRole = 'student';
   activeEnsIdx = idx;
+  const e = ensembles[idx];
+
+  // RLS blocks a student from seeing classmates' roster rows, so there's no
+  // loadRosterFromDB() call here — events, resources, and this student's
+  // own excuses (RLS-restricted) are all every active member may read.
+  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e)]);
+
   loadEnsembleContext();
-  const e = activeEns();
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
   const sw = document.getElementById('ensemble-switcher');
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
+  syncStudentHeader(e);
 
   // Student dropdown: enrolled ensembles + option to go back to landing
   const enrolledStu = ensembles.filter(en =>
@@ -3581,13 +5257,87 @@ function enterEnsembleAsStudent(idx) {
 
   renderAll();
   renderStuSchedule();
+  if (dataMode === 'live') await renderTodayCard();
 }
 
-function enterEnsemble(idx) {
+// Handles an invite-link visit: copyInviteLink() encodes a URL back to this
+// app with ?join=<ensembleId>. Opening a teacher's invite link while signed
+// in *is* the authorization — no more approval queue (see migration
+// 0012) — so this adds the account as an active student member the moment
+// it lands, then drops them straight into that ensemble.
+async function handleJoinDeepLink() {
+  if (dataMode !== 'live') return false;
+  const params = new URLSearchParams(window.location.search);
+  const ensembleId = params.get('join');
+  if (!ensembleId) return false;
+  history.replaceState(null, '', window.location.pathname); // consume the param so a refresh doesn't re-trigger this
+  let idx = ensembles.findIndex(en => en.id === ensembleId);
+  if (idx === -1) { showToast('Could not find that ensemble.'); return false; }
+  if (!ensembles[idx].myRole) {
+    const { error } = await sb.from('ensemble_members').insert({
+      ensemble_id: ensembleId, user_id: authSession.user.id,
+      email: currentStudent.email, name: currentStudent.name,
+      role: 'student', status: 'active',
+    });
+    if (error) { showToast('Could not join: ' + error.message); return false; }
+    await loadEnsemblesFromDB(); // refresh so myRole/enrolledStudentEmails reflect the new row
+    idx = ensembles.findIndex(en => en.id === ensembleId);
+  }
+  const name = ensembles[idx].name;
+  await enterEnsembleAsStudent(idx);
+  showToast('Welcome to ' + name + '!');
+  return true;
+}
+
+// Handles a QR check-in scan: genQR() encodes a real URL back to this app
+// with ?checkin=<eventId>&ensemble=<ensembleId> (live mode only — the demo
+// QR still points at a fake calltime.app domain, matching the original
+// mockup). Routes the signed-in student straight to that ensemble's home
+// tab where the check-in ring is — it does NOT auto-tap the ring; the
+// human still makes that gesture themselves.
+async function handleCheckinDeepLink() {
+  if (dataMode !== 'live') return false;
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get('checkin');
+  const ensembleId = params.get('ensemble');
+  if (!eventId || !ensembleId) return false;
+  history.replaceState(null, '', window.location.pathname); // consume the params so a refresh doesn't re-trigger this
+  const idx = ensembles.findIndex(en => en.id === ensembleId);
+  if (idx === -1) { showToast('Could not find that ensemble.'); return false; }
+  await enterEnsembleAsStudent(idx);
+  const ev = evList.find(e => e.id === eventId);
+  showToast(ev ? 'Ready to check in for ' + ev.n : 'Ready to check in');
+  return true;
+}
+
+async function enterEnsemble(idx) {
   lastRole = 'teacher';
   activeEnsIdx = idx;
+  const e = ensembles[idx];
+
+  // Only a teacher of this ensemble can see the full roster and email
+  // templates (RLS); fetch everything before rendering so students/
+  // evList/resources/tpls are populated by the time loadEnsembleContext()
+  // copies them onto the global arrays.
+  if (dataMode === 'live') {
+    await Promise.all([
+      loadRosterFromDB(e), loadEventsFromDB(e), loadResourcesFromDB(e), loadTemplatesFromDB(e),
+      loadGradingPolicyFromDB(e), loadNotificationRulesFromDB(e),
+    ]);
+    // Depends on e.students (roster) being populated already, so it can't
+    // run inside the Promise.all above.
+    await loadExcusesFromDB(e);
+  }
+
   loadEnsembleContext();
-  const e = activeEns();
+
+  // Merge in today's real attendance now that both the roster and the
+  // event list are loaded (pickTodayEvent() reads the global evList).
+  if (dataMode === 'live') {
+    await loadAttendanceForEvent(pickTodayEvent());
+    syncGradingSettingsUI(e);
+  }
+  syncArchiveButton(e);
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -3595,8 +5345,13 @@ function enterEnsemble(idx) {
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
   const sel = document.getElementById('ens-select');
-  sel.innerHTML = ensembles.map((en,i) =>
-    `<option value="${i}" ${i===idx?'selected':''}>${en.name}</option>`).join('');
+  // teacherEnsembles() excludes archived ones — but if the ensemble
+  // currently open *is* archived (reached via the landing page's Archived
+  // list), it still needs to appear here as the selected option.
+  const switcherList = teacherEnsembles();
+  if (e.archivedAt && !switcherList.includes(e)) switcherList.push(e);
+  sel.innerHTML = switcherList.map(en => { const i = ensembles.indexOf(en);
+    return `<option value="${i}" ${i===idx?'selected':''}>${en.name}</option>`; }).join('');
   document.getElementById('role-toggle').style.display = 'flex';
 
   // Switch to teacher view
@@ -3612,26 +5367,37 @@ function enterEnsemble(idx) {
   renderRules();
   updPol();
   renderResources();
+  if (dataMode === 'live') {
+    await renderTodayCard();
+    subscribeAttendanceRealtime(e.id);
+  }
 }
 
-function switchEnsemble(val) {
+async function switchEnsemble(val) {
   if(val === '__back__') { goLanding(); return; }
   saveEnsembleContext();
   // Switch as correct role
-  if(lastRole === 'student') enterEnsembleAsStudent(parseInt(val));
-  else enterEnsemble(parseInt(val));
+  if(lastRole === 'student') await enterEnsembleAsStudent(parseInt(val));
+  else await enterEnsemble(parseInt(val));
 }
 
-function goLanding() {
-  saveEnsembleContext();
+function goLanding(skipSave) {
+  unsubscribeAttendanceRealtime();
+  // Skipped right after deleteEnsemble(): activeEns() no longer points at
+  // the ensemble that was just on screen (it's gone, and activeEnsIdx has
+  // already been reset by the reload), so saving now would overwrite some
+  // unrelated ensemble's cached local state instead.
+  if (!skipSave) saveEnsembleContext();
   document.getElementById('ensemble-switcher').style.display = 'none';
   document.getElementById('topbar-brand').style.display = 'flex';
   document.getElementById('role-toggle').style.display = lastRole === 'teacher' ? 'flex' : 'none';
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
   document.getElementById('view-landing').classList.add('show');
   renderLanding();
+  const toggleEl = document.getElementById('landing-role-toggle');
+  if(toggleEl) toggleEl.style.display = canTeach() ? 'flex' : 'none';
   // Restore the correct role tab
-  if(lastRole === 'student') {
+  if(lastRole === 'student' || !canTeach()) {
     const stuBtn = document.getElementById('land-student-btn');
     if(stuBtn) setLandingRole('student', stuBtn, true); // true = skipAutoEnter
   } else {
@@ -3666,29 +5432,68 @@ function wizStep(dir) {
   document.getElementById('wiz-finish-btn').style.display = wizCurrentStep === 3 ? 'inline-flex' : 'none';
 }
 
-function finishWizard() {
+async function finishWizard() {
   const name = document.getElementById('wiz-name').value.trim();
   if(!name) { alert('Please enter an ensemble name.'); wizStep(-2); return; }
 
-  const newEns = {
-    id: Date.now(),
-    name,
-    sub:   document.getElementById('wiz-sub').value.trim(),
-    term:  document.getElementById('wiz-term').value.trim(),
-    teacher: document.getElementById('wiz-teacher').value.trim(),
-    email: document.getElementById('wiz-email').value.trim(),
-    color: wizColor,
-    desc:  document.getElementById('wiz-desc').value.trim(),
-    schedule: document.getElementById('wiz-sched').value.trim(),
-    driveURL: document.getElementById('wiz-drive').value.trim(),
-    ...ensembleDefaults(),
-    pol: {
-      free:  parseInt(document.getElementById('wiz-free').value),
-      fail:  parseInt(document.getElementById('wiz-fail').value),
-      ded:   parseInt(document.getElementById('wiz-ded').value),
-      tardy: parseInt(document.querySelector('#wiz-tardy-btns .chip.on')?.dataset.v || 3),
-    },
+  const sub      = document.getElementById('wiz-sub').value.trim();
+  const term     = document.getElementById('wiz-term').value.trim();
+  const teacher  = document.getElementById('wiz-teacher').value.trim();
+  const email    = document.getElementById('wiz-email').value.trim();
+  const desc     = document.getElementById('wiz-desc').value.trim();
+  const schedule = document.getElementById('wiz-sched').value.trim();
+  const driveURL = document.getElementById('wiz-drive').value.trim();
+  const pol = {
+    free:  parseInt(document.getElementById('wiz-free').value),
+    fail:  parseInt(document.getElementById('wiz-fail').value),
+    ded:   parseInt(document.getElementById('wiz-ded').value),
+    tardy: parseInt(document.querySelector('#wiz-tardy-btns .chip.on')?.dataset.v || 3),
+    excludeExcused: (document.querySelector('#wiz-excused-btns .chip.on')?.dataset.v || 'exclude') === 'exclude',
   };
+
+  let newEns;
+  if (dataMode === 'live') {
+    const { data: dbEns, error: ensErr } = await sb.from('ensembles').insert({
+      name, sub, term, teacher_name: teacher, teacher_email: email,
+      color: wizColor, description: desc, schedule, drive_url: driveURL,
+      created_by: authSession.user.id,
+      // The teacher creating this ensemble is presumably at the venue —
+      // captures the browser's IANA zone so api/cron/tick.js can convert
+      // this ensemble's event_date/start_time/end_time (unqualified wall-clock
+      // strings) to real UTC instants instead of treating them as its own
+      // server-local (UTC) time.
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago',
+    }).select().single();
+    if (ensErr) { showToast('Could not create ensemble: ' + ensErr.message); return; }
+
+    const { error: memErr } = await sb.from('ensemble_members').insert({
+      ensemble_id: dbEns.id, user_id: authSession.user.id, role: 'teacher', status: 'active',
+    });
+    if (memErr) { showToast('Ensemble created, but could not set you as its teacher: ' + memErr.message); }
+
+    // Persist the grading policy collected in step 2 — previously this only
+    // lived in newEns.pol locally until (if ever) the teacher separately
+    // opened Settings > Grading and clicked Save, which meant "decide this
+    // in the wizard" silently didn't stick for the excused-absences choice
+    // (or free/fail/ded/tardy) until then.
+    const { error: gpErr } = await sb.from('grading_policies').insert({
+      ensemble_id: dbEns.id, free_absences: pol.free, fail_threshold: pol.fail,
+      deduction_pct: pol.ded, tardies_per_absence: pol.tardy, exclude_excused_absences: pol.excludeExcused,
+    });
+    if (gpErr) { showToast('Ensemble created, but could not save the grading policy: ' + gpErr.message); }
+
+    newEns = mapDbEnsemble(dbEns, { role: 'teacher', status: 'active' });
+    newEns.pol = pol;
+    newEns.studentCount = 0;
+  } else {
+    // NB: ensembleDefaults() spreads *after* the fields above on purpose here —
+    // spreading it first would clobber wizColor/driveURL back to their defaults.
+    newEns = {
+      ...ensembleDefaults(),
+      id: Date.now(), name, sub, term, teacher, email,
+      color: wizColor, desc, schedule, driveURL, pol,
+    };
+  }
 
   ensembles.push(newEns);
   closeM('new-ensemble');
@@ -3702,79 +5507,42 @@ function finishWizard() {
   showToast(name + ' created!');
 }
 
-/* JOIN REQUESTS */
-function renderJoinRequests() {
-  const e = activeEns();
-  const pending = (e.joinRequests||[]).filter(r=>r.status==='pending');
-  const sec = document.getElementById('join-requests-section');
-  const list = document.getElementById('join-requests-list');
-  if(!sec || !list) return;
-  if(!pending.length) { sec.style.display='none'; return; }
-  sec.style.display = 'block';
-  list.innerHTML = pending.map((r,i) => `
-    <div style="background:var(--abg);border:.5px solid #FAC775;border-radius:var(--rs);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <div class="avatar" style="width:32px;height:32px;font-size:11px;flex-shrink:0">${r.initials||r.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${r.name}</div>
-        <div style="font-size:11px;color:var(--t2)">${r.email}</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="btn" style="font-size:12px;padding:5px 10px;color:var(--rd)" onclick="denyJoin('${r.email}')"><i class="ti ti-x"></i>Deny</button>
-        <button class="btn btnp" style="font-size:12px;padding:5px 10px" onclick="approveJoin('${r.email}')"><i class="ti ti-check"></i>Approve</button>
-      </div>
-    </div>`).join('');
-}
-
-function approveJoin(email) {
-  const e = activeEns();
-  const req = (e.joinRequests||[]).find(r=>r.email===email);
-  if(!req) return;
-  req.status = 'approved';
-  if(!e.enrolledStudentEmails) e.enrolledStudentEmails = [];
-  e.enrolledStudentEmails.push(email);
-  // Add to roster if not already there
-  if(!students.find(s=>s.e===email)) {
-    const i = req.initials || req.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    students.push({n:req.name, i, r:req.role||'Ensemble', e:email, s:'present', t:'—', a:0});
-    e.students = JSON.parse(JSON.stringify(students));
-    document.getElementById('roster-count').textContent = students.length;
-    renderRoster();
-  }
-  renderJoinRequests();
-  showToast(req.name + ' approved and added to roster!');
-}
-
-function denyJoin(email) {
-  const e = activeEns();
-  const req = (e.joinRequests||[]).find(r=>r.email===email);
-  if(req) req.status = 'denied';
-  renderJoinRequests();
-  showToast('Request denied.');
-}
-
-// Hook renderRoster to also render join requests
-const _origRenderRoster = renderRoster;
-renderRoster = function() {
-  _origRenderRoster();
-  renderJoinRequests();
-};
-
-// Hook switchTab to render join requests when roster tab opens
-const _origSwitchTab2 = switchTab;
-switchTab = function(id, btn) {
-  _origSwitchTab2(id, btn);
-  if(id==='roster') renderJoinRequests();
-};
-
-
 /* NOTES TAB */
-function savePreNotes() {
+// Loads today's saved pre/post notes into the textareas — called from
+// renderTodayCard() once pickTodayEvent() is known, live mode only.
+async function loadRehearsalNotesForEvent(ev) {
+  const preEl = document.getElementById('pre-notes');
+  const postEl = document.getElementById('post-notes');
+  if (!ev) { if (preEl) preEl.value = ''; if (postEl) postEl.value = ''; return; }
+  const { data, error } = await sb.from('rehearsal_notes').select('*').eq('event_id', ev.id).maybeSingle();
+  if (error) { console.error(error); return; }
+  if (preEl) preEl.value = data?.pre_notes || '';
+  if (postEl) postEl.value = data?.post_notes || '';
+}
+
+async function savePreNotes() {
   const lbl = document.getElementById('pre-notes-saved');
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const text = document.getElementById('pre-notes')?.value || '';
+    const { error } = await sb.from('rehearsal_notes')
+      .upsert({ event_id: ev.id, ensemble_id: activeEns().id, pre_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
+    if (error) { showToast('Could not save notes: ' + error.message); return; }
+  }
   if(lbl) { lbl.textContent = 'Saved ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); setTimeout(()=>lbl.textContent='',4000); }
 }
 
-function savePostNotes() {
+async function savePostNotes() {
   const lbl = document.getElementById('post-notes-saved');
+  if (dataMode === 'live') {
+    const ev = pickTodayEvent();
+    if (!ev) { showToast('No event scheduled today.'); return; }
+    const text = document.getElementById('post-notes')?.value || '';
+    const { error } = await sb.from('rehearsal_notes')
+      .upsert({ event_id: ev.id, ensemble_id: activeEns().id, post_notes: text, updated_at: new Date().toISOString() }, { onConflict: 'event_id' });
+    if (error) { showToast('Could not save notes: ' + error.message); return; }
+  }
   if(lbl) { lbl.textContent = 'Draft saved ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); setTimeout(()=>lbl.textContent='',4000); }
 }
 
@@ -3808,9 +5576,33 @@ function buildPostEmail() {
   if(prevEl) prevEl.textContent = body;
 }
 
-function sendPostEmail() {
+async function sendPostEmail() {
+  if (dataMode === 'live') {
+    const subject = document.getElementById('post-email-subject')?.value || 'Post-rehearsal notes';
+    const body = document.getElementById('post-email-body')?.value || '';
+    const recipients = students.map(s => s.e).filter(Boolean);
+    if (!recipients.length) { showToast('No student emails on file to send to.'); return; }
+
+    const results = await Promise.all(recipients.map(to => sendEmail(to, subject, body)));
+    const failCount = results.filter(ok => !ok).length;
+
+    const ev = pickTodayEvent();
+    if (ev) {
+      const rawNotes = document.getElementById('post-notes')?.value || '';
+      const { error } = await sb.from('rehearsal_notes').upsert({
+        event_id: ev.id, ensemble_id: activeEns().id, post_notes: rawNotes, post_sent_at: new Date().toISOString(),
+      }, { onConflict: 'event_id' });
+      if (error) console.error(error);
+    }
+
+    closeM('post-email');
+    document.getElementById('post-notes').value = '';
+    showToast(failCount ? `Sent, but ${failCount} email(s) failed.` : 'Post-rehearsal email sent to ' + recipients.length + ' student' + (recipients.length!==1?'s':'') + '!');
+    return;
+  }
+
+  // demo mode: unchanged — fakes a "sent" history entry, no network call
   closeM('post-email');
-  // Save the post note to sent history
   const postText = document.getElementById('post-notes')?.value.trim();
   if(postText) {
     const evName = document.getElementById('today-event-name')?.textContent || 'Rehearsal';
@@ -3843,13 +5635,43 @@ function sendPostEmail() {
 /* CUSTOM TEMPLATES */
 let customTpls = {}; // key -> {s: subject, b: body}
 
-function createCustomTpl() {
+function mapDbTemplate(row) {
+  return { s: row.subject || '', b: row.body || '' };
+}
+
+// Loads every saved template for the ensemble (built-in keys the teacher
+// has edited, plus any custom_* ones) and layers them over the defaults so
+// a never-touched built-in still renders correctly.
+async function loadTemplatesFromDB(e) {
+  const { data, error } = await sb.from('email_templates').select('*').eq('ensemble_id', e.id);
+  if (error) { console.error(error); showToast('Could not load templates: ' + error.message); return; }
+  const loaded = {};
+  (data || []).forEach(row => { loaded[row.key] = mapDbTemplate(row); });
+  e.tpls = { ...JSON.parse(JSON.stringify(defTpls)), ...loaded };
+  e.customTpls = {};
+  Object.keys(loaded).forEach(k => { if (!defTpls[k]) e.customTpls[k] = loaded[k]; });
+}
+
+async function upsertTemplateToDB(key, subject, body) {
+  const e = activeEns();
+  const { error } = await sb.from('email_templates')
+    .upsert({ ensemble_id: e.id, key, subject, body }, { onConflict: 'ensemble_id,key' });
+  if (error) { showToast('Could not save template: ' + error.message); return false; }
+  return true;
+}
+
+async function createCustomTpl() {
   const name = document.getElementById('new-tpl-name').value.trim();
   if(!name) { alert('Please enter a template name.'); return; }
   // Generate a safe key from the name
   const key = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_') + '_' + Date.now();
-  customTpls[key] = { s: name + ' — {{production_name}}', b: 'Hi {{student_name}},\n\n\n\n— {{teacher_name}}' };
-  tpls[key] = { ...customTpls[key] };
+  const tpl = { s: name + ' — {{production_name}}', b: 'Hi {{student_name}},\n\n\n\n— {{teacher_name}}' };
+  if (dataMode === 'live') {
+    const ok = await upsertTemplateToDB(key, tpl.s, tpl.b);
+    if (!ok) return;
+  }
+  customTpls[key] = tpl;
+  tpls[key] = { ...tpl };
   closeM('new-tpl');
   document.getElementById('new-tpl-name').value = '';
   renderCustomTplChips(key);
@@ -3870,8 +5692,13 @@ function renderCustomTplChips(activateKey) {
   }).join('');
 }
 
-function deleteCustomTpl(key) {
+async function deleteCustomTpl(key) {
   if(!confirm('Delete this template?')) return;
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('email_templates').delete().eq('ensemble_id', e.id).eq('key', key);
+    if (error) { showToast('Could not delete template: ' + error.message); return; }
+  }
   delete tpls[key];
   delete customTpls[key];
   // If currently viewing this template, switch to absence
@@ -3903,9 +5730,15 @@ function selectGradeModel(model) {
   gradeModel = model;
   document.getElementById('gm-pct').classList.toggle('on', model==='pct');
   document.getElementById('gm-letter').classList.toggle('on', model==='letter');
+  document.getElementById('gm-points').classList.toggle('on', model==='points');
   document.getElementById('grading-pct-section').style.display = model==='pct' ? 'block' : 'none';
   document.getElementById('grading-letter-section').style.display = model==='letter' ? 'block' : 'none';
+  document.getElementById('grading-points-section').style.display = model==='points' ? 'block' : 'none';
+  // Free-absence grace period doesn't apply to the points pool — the pool
+  // size itself is the cushion (see the points-section card comment).
+  document.getElementById('grading-limits-card').style.display = model==='points' ? 'none' : 'block';
   renderLetterRules();
+  updPoints();
   renderRoster();
 }
 
@@ -3997,30 +5830,32 @@ function selectLoginRole(role) {
   document.getElementById('role-student-btn').classList.toggle('on', role==='student');
 }
 
-function sendMagicLink() {
-  const email = document.getElementById('login-email').value.trim();
-  if(!email || !email.includes('@')) {
-    document.getElementById('login-email').style.borderColor = 'rgba(226,75,74,.8)';
-    document.getElementById('login-email').focus();
-    return;
-  }
-  document.getElementById('login-email-confirm').textContent = email;
-  document.getElementById('login-card').style.display = 'none';
-  document.getElementById('check-email-card').style.display = 'block';
-}
-
 function showLoginCard() {
   document.getElementById('login-card').style.display = 'block';
   document.getElementById('check-email-card').style.display = 'none';
 }
 
+// Dev/demo shortcut — skips real auth. See "Skip for now (demo mode)" on the
+// check-email card. Resets back to the seed data, so switching from a real
+// signed-in (live) session into demo mode never leaks DB-loaded ensembles.
 function bypassLogin() {
+  dataMode = 'demo';
+  ensembles = DEMO_ENSEMBLES;
+  activeEnsIdx = 0;
+  enterApp();
+}
+
+// Shared by the real magic-link sign-in (via onAuthStateChange, above) and
+// the demo bypass button: reveal the app and land on the right role view.
+function enterApp() {
   const soBtn = document.getElementById('signout-btn');
   if(soBtn) soBtn.style.display = 'inline-flex';
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
   document.getElementById('view-landing').classList.add('show');
   renderLanding();
-  if(loginRole === 'student') {
+  const toggleEl = document.getElementById('landing-role-toggle');
+  if(toggleEl) toggleEl.style.display = canTeach() ? 'flex' : 'none';
+  if(loginRole === 'student' || !canTeach()) {
     const stuBtn = document.getElementById('land-student-btn');
     if(stuBtn) setLandingRole('student', stuBtn, false);
   } else {
@@ -4029,27 +5864,35 @@ function bypassLogin() {
   }
 }
 
-function signOut() {
-  // Hide sign out btn, reset topbar
+// Resets the UI back to the login screen. Called after sb.auth.signOut()
+// resolves (see signOut(), above) and on the SIGNED_OUT auth event.
+function resetToLogin() {
+  unsubscribeAttendanceRealtime();
   const soBtn = document.getElementById('signout-btn');
   if(soBtn) soBtn.style.display = 'none';
   document.getElementById('ensemble-switcher').style.display = 'none';
   document.getElementById('topbar-brand').style.display = 'flex';
   document.getElementById('role-toggle').style.display = 'none';
-  // Reset login screen
   document.getElementById('login-card').style.display = 'block';
   document.getElementById('check-email-card').style.display = 'none';
+  document.getElementById('login-name').value = '';
   document.getElementById('login-email').value = '';
+  document.getElementById('login-error').style.display = 'none';
   loginRole = 'teacher';
   selectLoginRole('teacher');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
   document.getElementById('view-login').classList.add('show');
-
-  loginRole = 'teacher';
-  selectLoginRole('teacher');}
+}
 
 /* BOOT */
 renderLanding();
+// If this page load came from an invite link and the visitor isn't signed
+// in yet, default the login screen's picker to Student — matches what
+// onAuthStateChange forces loginRole to once they actually sign in.
+if (new URLSearchParams(window.location.search).has('join')) {
+  const stuBtn = document.getElementById('role-student-btn');
+  if (stuBtn) selectLoginRole('student');
+}
 </script>
 </body>
 </html>
