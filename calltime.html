@@ -191,12 +191,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div id="topbar-brand" class="brand" style="font-size:15px"><i class="ti ti-masks-theater"></i>Call Time</div>
   </div>
-  <div class="rtog" id="role-toggle" style="display:none">
-    <button class="rbtn" onclick="switchRole('student',this)">Student</button>
-    <button class="rbtn on" onclick="switchRole('teacher',this)">Teacher</button>
-  <button id="signout-btn" style="display:none;background:none;border:none;color:var(--t2);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:var(--rs)" onclick="signOut()" title="Sign out">
-    <i class="ti ti-logout" style="font-size:16px;vertical-align:-2px"></i>
-  </button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="rtog" id="role-toggle" style="display:none">
+      <button class="rbtn" onclick="switchRole('student',this)">Student</button>
+      <button class="rbtn on" onclick="switchRole('teacher',this)">Teacher</button>
+    </div>
+    <!-- Deliberately a sibling of #role-toggle, not nested inside it — that
+         toggle is hidden while in the student view (enterEnsembleAsStudent()),
+         and a hidden parent hides its children regardless of their own
+         display style, which was silently taking sign-out down with it. -->
+    <button id="signout-btn" style="display:none;background:none;border:none;color:var(--t2);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:var(--rs)" onclick="signOut()" title="Sign out">
+      <i class="ti ti-logout" style="font-size:16px;vertical-align:-2px"></i>
+    </button>
   </div>
 </div>
 
