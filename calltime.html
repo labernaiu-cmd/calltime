@@ -2312,6 +2312,7 @@ async function toggleCI(){
       if (error) { showToast('Could not check out: ' + error.message); return; }
     }
     await syncCheckInRing(ev);
+    await updateStudentBadge(activeEns());
     return;
   }
 
@@ -5192,6 +5193,31 @@ function syncStudentHeader(e) {
   if (roleEl) roleEl.textContent = e ? e.name : '';
 }
 
+// The "N absences" pill on the student topbar was static HTML — "2
+// absences", the sample Jordan Martinez data — and nothing in live mode
+// ever recomputed it, so every real student saw that same sample number
+// forever regardless of their actual record. Queries this student's own
+// attendance/excuses rows directly (RLS lets an active member read their
+// own rows even though they can't see classmates'), applying the same
+// excused-absences policy gradedAbsences() uses on the teacher's roster.
+async function updateStudentBadge(e) {
+  const badge = document.getElementById('stu-badge');
+  if (!badge) return;
+  if (dataMode !== 'live') {
+    const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
+    badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+    return;
+  }
+  const [{ data: absences }, { data: excusedRows }] = await Promise.all([
+    sb.from('attendance').select('id').eq('ensemble_id', e.id).eq('user_id', authSession.user.id).eq('status', 'absent'),
+    sb.from('excuses').select('id').eq('ensemble_id', e.id).eq('user_id', authSession.user.id).eq('status', 'approved'),
+  ]);
+  const raw = (absences||[]).length;
+  const excused = (excusedRows||[]).length;
+  const count = pol.excludeExcused ? Math.max(0, raw - excused) : raw;
+  badge.textContent = count + ' absence' + (count!==1?'s':'');
+}
+
 function openEditName() {
   const input = document.getElementById('edit-name-input');
   if (input) input.value = currentStudent.name;
@@ -5231,9 +5257,10 @@ async function enterEnsembleAsStudent(idx) {
   const e = ensembles[idx];
 
   // RLS blocks a student from seeing classmates' roster rows, so there's no
-  // loadRosterFromDB() call here — events, resources, and this student's
-  // own excuses (RLS-restricted) are all every active member may read.
-  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e)]);
+  // loadRosterFromDB() call here — events, resources, this student's own
+  // excuses, and the grading policy (needed for updateStudentBadge()'s
+  // excused-absences math below) are all every active member may read.
+  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e), loadGradingPolicyFromDB(e)]);
 
   loadEnsembleContext();
 
@@ -5243,6 +5270,7 @@ async function enterEnsembleAsStudent(idx) {
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
   syncStudentHeader(e);
+  await updateStudentBadge(e);
 
   // Student dropdown: enrolled ensembles + option to go back to landing
   const enrolledStu = ensembles.filter(en =>
