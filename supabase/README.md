@@ -23,14 +23,15 @@ folder in order (or use the Supabase CLI: `supabase db push`):
    table, implementing spec §1.3 ("teachers can do everything in their
    ensembles; students can read events, read their own attendance/excuses,
    insert check-ins"):
-   - `ensembles` — readable by any signed-in user (students need to browse
-     ensembles to send join requests), writable only by that ensemble's
-     teacher.
+   - `ensembles` — readable by any signed-in user (an invite link has to
+     resolve for whoever opens it — see migration 0012), writable only by
+     that ensemble's teacher.
    - `ensemble_members` — a user always sees their own row; teachers see
-     every row in their ensemble. A user can insert a `pending` `student`
-     row for themselves (a join request) or, if they created the ensemble,
-     a `teacher` row for themselves. Teachers can insert/update/delete any
-     member row (approve/deny requests, add students, edit roles).
+     every row in their ensemble. A user can insert an `active` `student`
+     row for themselves (superseded by migration 0012 — originally
+     `pending`, back when joining went through a teacher-approval queue) or,
+     if they created the ensemble, a `teacher` row for themselves. Teachers
+     can insert/update/delete any member row (add students, edit roles).
    - Everything else (`events`, `attendance`, `excuses`,
      `grading_policies`, `resources`, `rehearsal_notes`) — readable by any
      active member of the ensemble; writable by that ensemble's teacher.
@@ -86,6 +87,18 @@ folder in order (or use the Supabase CLI: `supabase db push`):
     third grading model (alongside `pct`/`letter`) selected in Settings >
     Grading: a points pool a student either has deducted from per absence
     or earns toward per rehearsal attended. See `pointsBalance()` in
+    `calltime.html`.
+11. `migrations/0011_ensemble_archive.sql` — adds `ensembles.archived_at`,
+    behind Settings > General's "Archive ensemble" (a reversible way to get
+    an old ensemble out of the landing list, as opposed to "Delete
+    ensemble" there, which is permanent and cascades through every table).
+12. `migrations/0012_invite_link_join.sql` — replaces the old
+    "request to join, teacher approves" flow with invite links: a teacher
+    copies a per-ensemble link (Roster tab or Settings > General) and
+    shares it directly; a student who opens it while signed in is added as
+    an *active* member immediately, no approval step. Swaps the RLS policy
+    that let a student self-insert a `pending` row for one that allows
+    `active` instead. See `copyInviteLink()`/`handleJoinDeepLink()` in
     `calltime.html`.
 
 ## 3. Enable email auth

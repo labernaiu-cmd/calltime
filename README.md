@@ -159,3 +159,11 @@ Kept out of scope rather than half-built:
   "never" as its end** is capped at 52 occurrences instead — both are
   guardrails against an unbounded insert, not a real "repeats forever"
   feature. See `computeRecurrenceDates()`.
+- **Invite links aren't a hardened invite system** — `?join=<ensembleId>`
+  (see `copyInviteLink()`/`handleJoinDeepLink()`) is just the ensemble's own
+  id, not a separate single-use token, and RLS still lets any signed-in
+  user read the `ensembles` table. Anyone who both guesses/finds an id and
+  is signed in could self-join, though there's no listing UI left that
+  hands ids out. Fine for a single teacher sharing a link with their own
+  class; would need a real invite-token table before this holds up as
+  actual access control.

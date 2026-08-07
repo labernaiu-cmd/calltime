@@ -304,16 +304,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn" style="width:100%;justify-content:center;padding:12px" onclick="openM('new-ensemble')">
         <i class="ti ti-plus"></i>Create new ensemble
       </button>
+      <div id="archived-ensembles" style="display:flex;flex-direction:column;gap:10px;margin-top:1.5rem"></div>
     </div>
 
-    <!-- STUDENT: enrolled ensembles + join requests -->
+    <!-- STUDENT: enrolled ensembles -->
     <div id="landing-student" style="display:none">
       <div id="student-ensemble-cards" style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.25rem"></div>
-
-      <div style="margin-top:1.5rem">
-        <div class="slbl">Join an ensemble</div>
-        <div id="join-request-cards" style="display:flex;flex-direction:column;gap:8px"></div>
-      </div>
     </div>
 
   </div>
@@ -478,15 +474,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="rbw">
       <div class="slbl" style="margin:0">Cast &amp; crew — <span id="roster-count">14</span> members</div>
       <div style="display:flex;gap:8px">
+        <button class="btn" onclick="copyInviteLink()"><i class="ti ti-link"></i>Copy invite link</button>
         <button class="btn" onclick="openM('import')"><i class="ti ti-table-import"></i>Import roster</button>
         <button class="btn btnp" onclick="openM('student')"><i class="ti ti-user-plus"></i>Add student</button>
       </div>
-    </div>
-
-    <!-- Pending join requests -->
-    <div id="join-requests-section" style="display:none;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--am);margin-bottom:8px"><span class="pdot"></span>Join requests pending</div>
-      <div id="join-requests-list"></div>
     </div>
 
     <div class="card">
@@ -594,6 +585,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="stab" onclick="switchStab('notifications',this)">Notifications</button>
       <button class="stab" onclick="switchStab('templates',this)">Email templates</button>
       <button class="stab" onclick="switchStab('checkin',this)">Check-in rules</button>
+      <button class="stab" onclick="switchStab('general',this)">General</button>
     </div>
 
     <!-- GRADING -->
@@ -871,6 +863,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button class="btn btnp" onclick="saveAll('cfm-checkin')"><i class="ti ti-device-floppy"></i>Save rules</button>
       </div>
       <div class="cfm" id="cfm-checkin"><i class="ti ti-circle-check" style="vertical-align:-2px"></i> Check-in rules saved.</div>
+    </div>
+
+    <!-- GENERAL -->
+    <div class="spane" id="s-general">
+      <div class="card">
+        <div class="ctitle">Invite students</div>
+        <div class="csub">Share this ensemble's invite link — anyone who opens it and signs in is added as a student automatically, no approval needed.</div>
+        <button class="btn" onclick="copyInviteLink()"><i class="ti ti-link"></i>Copy invite link</button>
+      </div>
+
+      <div class="card" style="border-color:var(--rd)">
+        <div class="ctitle" style="color:var(--rd)">Danger zone</div>
+        <div class="csub">Archiving hides this ensemble from your list without deleting anything — bring it back anytime. Deleting is permanent and removes all its events, attendance, and roster data.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="archive-ens-btn" onclick="toggleArchiveEnsemble()"><i class="ti ti-archive"></i>Archive ensemble</button>
+          <button class="btn" style="color:var(--rd)" onclick="deleteEnsemble()"><i class="ti ti-trash"></i>Delete ensemble</button>
+        </div>
+      </div>
     </div>
   </div><!-- /settings -->
 </div><!-- /teacher -->
@@ -1903,8 +1913,13 @@ if (sb) {
       // sending, since that's the one thing that survives the round trip.
       const savedRole = localStorage.getItem('ct_login_role');
       if (savedRole) { loginRole = savedRole; localStorage.removeItem('ct_login_role'); }
+      // An invite link always means joining as a student, regardless of
+      // whatever the login screen's Teacher/Student picker happened to
+      // default to (or what a stale ct_login_role says).
+      if (new URLSearchParams(window.location.search).has('join')) loginRole = 'student';
       await loadEnsemblesFromDB();
       enterApp();
+      await handleJoinDeepLink(); // no-op unless the URL has ?join=<ensembleId> (see copyInviteLink())
       await handleCheckinDeepLink(); // no-op unless the URL has ?checkin=<eventId>&ensemble=<ensembleId> (see genQR())
     } else if (event === 'SIGNED_OUT') {
       resetToLogin();
@@ -2778,8 +2793,9 @@ function parsePaste() {
 
 async function importPasted() {
   if(!parsedStudents.length) return;
+  const sendInvites = document.getElementById('send-invites').checked;
   if (dataMode === 'live') {
-    const ok = await insertRosterMembers(parsedStudents);
+    const ok = await insertRosterMembers(parsedStudents, sendInvites);
     if (!ok) return;
   } else {
     students.push(...parsedStudents);
@@ -2792,8 +2808,6 @@ async function importPasted() {
   document.getElementById('paste-input').value = '';
   document.getElementById('paste-preview').style.display = 'none';
   document.getElementById('paste-import-btn').style.display = 'none';
-  const sendInvites = document.getElementById('send-invites').checked;
-  // In production: fire invite emails here
   showToast(ct + ' students imported' + (sendInvites ? ' — invites sent!' : '.'));
 }
 
@@ -2828,8 +2842,9 @@ function handleCSV(input) {
 
 async function importCSV() {
   if(!parsedCSV.length) return;
+  const sendInvites = document.getElementById('send-invites').checked;
   if (dataMode === 'live') {
-    const ok = await insertRosterMembers(parsedCSV);
+    const ok = await insertRosterMembers(parsedCSV, sendInvites);
     if (!ok) return;
   } else {
     students.push(...parsedCSV);
@@ -2839,13 +2854,13 @@ async function importCSV() {
   closeM('import');
   const ct = parsedCSV.length;
   parsedCSV = [];
-  showToast(ct + ' students imported from CSV!');
+  showToast(ct + ' students imported from CSV' + (sendInvites ? ' — invites sent!' : '.'));
 }
 
 // Shared by importPasted()/importCSV(): inserts {n,e,r} rows into
 // ensemble_members (no user_id yet — see migration 0003) and reloads the
 // roster so e.students/students[] reflect what actually landed in the DB.
-async function insertRosterMembers(rows) {
+async function insertRosterMembers(rows, sendInvites) {
   const e = activeEns();
   const { error } = await sb.from('ensemble_members').insert(rows.map(s => ({
     ensemble_id: e.id, name: s.n, email: s.e || null, part: s.r,
@@ -2854,6 +2869,7 @@ async function insertRosterMembers(rows) {
   if (error) { showToast('Import failed: ' + error.message); return false; }
   await loadRosterFromDB(e);
   loadEnsembleContext();
+  if (sendInvites) rows.forEach(s => sendWelcomeEmail(e, s.n, s.e));
   return true;
 }
 
@@ -2872,6 +2888,7 @@ async function addStudent() {
     if (error) { showToast('Could not add student: ' + error.message); return; }
     await loadRosterFromDB(e);
     loadEnsembleContext();
+    if (email) sendWelcomeEmail(e, n, email);
   } else {
     const i = n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     students.push({n, i, r, e:email, s:'present', t:'—', a:0});
@@ -2883,7 +2900,7 @@ async function addStudent() {
   document.getElementById('new-s-email').value='';
   document.getElementById('new-s-role').value='';
   document.getElementById('new-s-parent').value='';
-  showToast(n + ' added' + (dataMode==='live' ? '.' : ' — invite sent to ' + (email||'student')));
+  showToast(n + ' added' + (dataMode==='live' && email ? ' — invite sent!' : '.'));
 }
 
 function showToast(msg) {
@@ -2976,6 +2993,78 @@ function printQR() {
     </div>
     </body></html>`);
   win.document.close();
+}
+
+// Builds this ensemble's invite link (see handleJoinDeepLink()) and copies
+// it to the clipboard — the replacement for the old browse-all-ensembles
+// "request to join" flow. Just the ensemble's id in a query param, so
+// anyone signed in who has the link can join; there's no separate invite
+// token. That's an accepted tradeoff for a single-teacher classroom tool,
+// not a hardened invite system.
+async function copyInviteLink() {
+  const e = activeEns();
+  if (!e || dataMode !== 'live') { showToast('Invite links need live mode (real sign-in).'); return; }
+  const url = `${window.location.origin}${window.location.pathname}?join=${e.id}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Invite link copied!');
+  } catch (err) {
+    showToast('Could not copy automatically — link: ' + url);
+  }
+}
+
+// Emails a student a teacher just added directly (addStudent()/roster
+// import) their invite link. They're already an active member at this
+// point — the link is just "click here to get started"; handleJoinDeepLink()
+// no-ops the membership insert if one already exists, so it's safe to send
+// regardless. Fire-and-forget, same pattern as the other notification sends.
+function sendWelcomeEmail(e, name, email) {
+  if (!email) return;
+  const url = `${window.location.origin}${window.location.pathname}?join=${e.id}`;
+  sendEmail(email, `You're in — ${e.name} on Call Time`,
+    `Hi ${name},\n\n${e.teacher || 'Your director'} added you to ${e.name} on Call Time. Sign in here to get started:\n${url}`);
+}
+
+// Reflects e.archivedAt on Settings > General's archive button — called
+// whenever a teacher enters an ensemble (enterEnsemble()) and right after
+// toggleArchiveEnsemble() changes it.
+function syncArchiveButton(e) {
+  const btn = document.getElementById('archive-ens-btn');
+  if (!btn) return;
+  btn.innerHTML = e.archivedAt
+    ? '<i class="ti ti-archive-off"></i>Unarchive ensemble'
+    : '<i class="ti ti-archive"></i>Archive ensemble';
+}
+
+async function toggleArchiveEnsemble() {
+  const e = activeEns();
+  const archiving = !e.archivedAt;
+  if (dataMode === 'live') {
+    const { error } = await sb.from('ensembles')
+      .update({ archived_at: archiving ? new Date().toISOString() : null }).eq('id', e.id);
+    if (error) { showToast('Could not update: ' + error.message); return; }
+  }
+  e.archivedAt = archiving ? new Date().toISOString() : null;
+  showToast(archiving ? e.name + ' archived.' : e.name + ' unarchived.');
+  if (archiving) { goLanding(); return; } // an archived ensemble shouldn't stay open in the teacher view
+  syncArchiveButton(e);
+}
+
+async function deleteEnsemble() {
+  const e = activeEns();
+  if (!confirm(`Permanently delete "${e.name}"? This removes all its events, attendance, excuses, and roster data. This cannot be undone.`)) return;
+  if (dataMode === 'live') {
+    // Every other table's ensemble_id FK is `on delete cascade` (see
+    // 0001_init_schema.sql), so this one delete is enough to remove
+    // everything tied to this ensemble.
+    const { error } = await sb.from('ensembles').delete().eq('id', e.id);
+    if (error) { showToast('Could not delete: ' + error.message); return; }
+    await loadEnsemblesFromDB();
+  } else {
+    ensembles = ensembles.filter(en => en !== e);
+  }
+  showToast(e.name + ' deleted.');
+  goLanding(true);
 }
 
 /* CUSTOM RECURRENCE */
@@ -4280,7 +4369,6 @@ const ensembleDefaults = () => ({
   calFilter: 'all',
   reportSort: {key:'absent', dir:-1},
   color: '#534AB7',
-  joinRequests: [], // {name, initials, email, role, status:'pending'|'approved'|'denied'}
 });
 
 // Seed data for "Skip for now (demo mode)" — never touches Supabase.
@@ -4340,12 +4428,16 @@ let activeEnsIdx = 0;
 
 function activeEns() { return ensembles[activeEnsIdx]; }
 
-// In live mode `ensembles` holds every ensemble in the system (students
-// need to browse all of them to send join requests); teacher-facing UI
-// (landing cards, the ensemble switcher) should only ever list the ones
-// this signed-in user actually teaches.
+// In live mode `ensembles` holds every ensemble in the system (any signed-in
+// user's invite link has to resolve); teacher-facing UI (landing cards, the
+// ensemble switcher) should only ever list the ones this signed-in user
+// actually teaches, and — by default — isn't archived.
 function teacherEnsembles() {
-  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher') : ensembles;
+  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher' && !e.archivedAt) : ensembles;
+}
+
+function archivedTeacherEnsembles() {
+  return dataMode === 'live' ? ensembles.filter(e => e.myRole === 'teacher' && e.archivedAt) : [];
 }
 
 /* ═══════════════════════════════════════════
@@ -4364,12 +4456,17 @@ function nameFromEmail(email) {
 
 // Maps a DB `ensembles` row (+ the current user's own ensemble_members row,
 // if any) into the shape every render function in this file already
-// expects. `students`/`joinRequests` stay unpopulated here — those come
-// from the roster query in loadRosterFromDB(), run when a teacher opens
-// the ensemble (full roster) since RLS only lets a student see their own
-// membership row, never their classmates'.
+// expects. `students` stays unpopulated here — that comes from the roster
+// query in loadRosterFromDB(), run when a teacher opens the ensemble (full
+// roster) since RLS only lets a student see their own membership row,
+// never their classmates'.
 function mapDbEnsemble(dbEns, myMembership) {
-  const isMyPendingOrDenied = myMembership && myMembership.role === 'student' && myMembership.status !== 'active';
+  // Self-heal: if this account created the ensemble but has no matching
+  // "teacher" row (e.g. that insert failed at creation time — see
+  // finishWizard()'s memErr toast — or the row got deleted some other
+  // way), still recognize it as theirs. loadEnsemblesFromDB() backfills
+  // the actual row once this fires, so it's a one-time repair.
+  const isOwnerWithoutRow = !myMembership && dbEns.created_by && authSession?.user?.id === dbEns.created_by;
   const isMyActiveEnrollment = myMembership && myMembership.role === 'student' && myMembership.status === 'active';
   return {
     ...ensembleDefaults(),
@@ -4385,12 +4482,10 @@ function mapDbEnsemble(dbEns, myMembership) {
     driveURL: dbEns.drive_url || '',
     tz: dbEns.tz || 'America/Chicago',
     createdBy: dbEns.created_by,
-    myRole: myMembership ? myMembership.role : null,
-    myStatus: myMembership ? myMembership.status : null,
+    archivedAt: dbEns.archived_at || null,
+    myRole: myMembership ? myMembership.role : (isOwnerWithoutRow ? 'teacher' : null),
+    myStatus: myMembership ? myMembership.status : (isOwnerWithoutRow ? 'active' : null),
     students: [],
-    joinRequests: isMyPendingOrDenied
-      ? [{ name: currentStudent.name, email: currentStudent.email, status: myMembership.status }]
-      : [],
     enrolledStudentEmails: isMyActiveEnrollment ? [currentStudent.email] : [],
   };
 }
@@ -4427,11 +4522,6 @@ function pointsBalance(s) {
     : Math.max(0, pointsTotal - gradedAbsences(s) * pointsPerEvent);
 }
 
-function mapMemberToJoinRequest(m) {
-  const name = m.name || nameFromEmail(m.email);
-  return { name, initials: initialsFromName(name), email: m.email || '', role: m.part || '', status: m.status, memberId: m.id };
-}
-
 // Full roster for the ensemble the teacher is currently in — every member
 // row, not just the signed-in user's own (RLS allows this for teachers only).
 // Absence counts come from real attendance rows, not a stored counter
@@ -4457,11 +4547,11 @@ async function loadRosterFromDB(e) {
   (presentRes.data || []).forEach(p => { presentCounts[p.user_id] = (presentCounts[p.user_id]||0) + 1; });
   e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
     .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0, m.user_id ? presentCounts[m.user_id] : 0));
-  e.joinRequests = rows.filter(m => m.role === 'student' && m.status !== 'active').map(mapMemberToJoinRequest);
 }
 
-// Every ensemble in the system (any signed-in user may browse — students
-// need this to send join requests) plus the signed-in user's own
+// Every ensemble in the system (RLS lets any signed-in user read the
+// `ensembles` table, since an invite link — see handleJoinDeepLink() — has
+// to be resolvable by whoever opens it) plus the signed-in user's own
 // membership rows, so we know which ones they teach/are enrolled in
 // without a per-ensemble round trip.
 async function loadEnsemblesFromDB() {
@@ -4480,12 +4570,24 @@ async function loadEnsemblesFromDB() {
   }
   const countByEns = {};
   (studentCountRes.data || []).forEach(r => { countByEns[r.ensemble_id] = (countByEns[r.ensemble_id] || 0) + 1; });
+  const myRows = myRes.data || [];
   ensembles = (ensRes.data || []).map(dbEns => {
-    const ens = mapDbEnsemble(dbEns, (myRes.data || []).find(m => m.ensemble_id === dbEns.id));
+    const ens = mapDbEnsemble(dbEns, myRows.find(m => m.ensemble_id === dbEns.id));
     ens.studentCount = countByEns[dbEns.id] || 0;
     return ens;
   });
   activeEnsIdx = 0;
+
+  // Backfill any ensemble mapDbEnsemble() recognized via the created_by
+  // self-heal (myRole set without a real myMembership row) — repairs the
+  // actual DB gap instead of just working around it on every load. Not
+  // awaited on the critical path; if it fails, next sign-in tries again.
+  const orphaned = ensembles.filter(e => e.myRole === 'teacher' && !myRows.some(m => m.ensemble_id === e.id));
+  if (orphaned.length) {
+    sb.from('ensemble_members').insert(
+      orphaned.map(e => ({ ensemble_id: e.id, user_id: uid, role: 'teacher', status: 'active' }))
+    ).then(({ error }) => { if (error) console.error('teacher row backfill failed', error); });
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -4859,27 +4961,43 @@ function setLandingRole(role, btn, skipAutoEnter) {
 }
 
 function renderLanding() {
-  // Teacher cards. In live mode `ensembles` holds every ensemble in the
-  // system (students need to browse all of them to send join requests —
-  // see renderStudentLanding) so the teacher landing must filter down to
-  // the ones this user actually teaches.
   const el = document.getElementById('ensemble-cards');
   if(!el) return;
   const list = teacherEnsembles();
   if(dataMode === 'live' && list.length === 0) {
     el.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You don\'t teach any ensembles yet.<br>Create one below to get started.</div>';
-    return;
+  } else {
+    el.innerHTML = list.map(e => { const i = ensembles.indexOf(e); const count = dataMode === 'live' ? (e.studentCount||0) : (e.students||[]).length; return `
+      <div class="ens-card" onclick="enterEnsemble(${i})">
+        <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:var(--tx)">${e.name}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${count} students</div>
+        </div>
+        <i class="ti ti-chevron-right" style="color:var(--t3);font-size:18px"></i>
+      </div>`; }).join('');
   }
-  el.innerHTML = list.map(e => { const i = ensembles.indexOf(e); const count = dataMode === 'live' ? (e.studentCount||0) : (e.students||[]).length; return `
-    <div class="ens-card" onclick="enterEnsemble(${i})">
-      <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:16px;font-weight:700;color:var(--tx)">${e.name}</div>
-        <div style="font-size:12px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:3px">${e.term||''} · ${count} students</div>
-      </div>
-      <i class="ti ti-chevron-right" style="color:var(--t3);font-size:18px"></i>
-    </div>`; }).join('');
+
+  // Archived ensembles get a separate, visually de-emphasized list further
+  // down the landing page rather than a hidden view — clicking one still
+  // opens it normally (Settings > General has the "Unarchive" action).
+  const elArch = document.getElementById('archived-ensembles');
+  if(elArch) {
+    const archived = archivedTeacherEnsembles();
+    elArch.innerHTML = archived.length ? `
+      <div class="slbl">Archived</div>
+      ${archived.map(e => { const i = ensembles.indexOf(e); return `
+        <div class="ens-card" style="opacity:.55" onclick="enterEnsemble(${i})">
+          <div class="ens-icon" style="background:${e.color}"><i class="ti ti-music"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--tx)">${e.name}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">${e.sub||''}</div>
+          </div>
+          <span class="badge bg">Archived</span>
+        </div>`; }).join('')}
+    ` : '';
+  }
 }
 
 function renderStudentLanding(skipAutoEnter) {
@@ -4898,7 +5016,7 @@ function renderStudentLanding(skipAutoEnter) {
   const elEnr = document.getElementById('student-ensemble-cards');
   if(elEnr) {
     if(enrolled.length === 0) {
-      elEnr.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You are not enrolled in any ensembles yet.<br>Request to join one below.</div>';
+      elEnr.innerHTML = '<div style="font-size:13px;color:var(--t3);text-align:center;padding:1rem">You\'re not in any ensembles yet.<br>Ask your director for an invite link to join one.</div>';
     } else {
       elEnr.innerHTML = enrolled.map(e => {
         const i = ensembles.indexOf(e);
@@ -4914,74 +5032,6 @@ function renderStudentLanding(skipAutoEnter) {
       }).join('');
     }
   }
-
-  // Show ALL ensembles in join section so student can see what's available —
-  // except ones this account already teaches (myRole==='teacher'). Those
-  // already have an ensemble_members row for this user, so offering a
-  // student "Request to join" button for them would hit the DB's
-  // (ensemble_id, user_id) unique constraint the moment it's clicked.
-  const elJoin = document.getElementById('join-request-cards');
-  if(elJoin) {
-    const joinable = ensembles.filter(e => e.myRole !== 'teacher');
-    if(joinable.length === 0) {
-      elJoin.innerHTML = '<div style="font-size:13px;color:var(--t3);padding:8px 0">No ensembles available yet.</div>';
-    } else {
-      elJoin.innerHTML = joinable.map(e => {
-        const i = ensembles.indexOf(e);
-        const isEnrolled = enrolled.includes(e);
-        const req = (e.joinRequests||[]).find(r => r.email === currentStudent.email);
-        let actionBtn = '';
-        if(isEnrolled) {
-          actionBtn = '<span class="badge bg">Enrolled</span>';
-        } else if(!req) {
-          actionBtn = `<button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="event.stopPropagation();requestJoin(${i})"><i class="ti ti-send"></i>Request to join</button>`;
-        } else if(req.status === 'pending') {
-          actionBtn = '<span class="badge bpend">Request pending</span>';
-        } else if(req.status === 'denied') {
-          actionBtn = '<span class="badge bunexc">Not approved</span>';
-        }
-        return `<div style="background:var(--sf);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px">
-          <div class="ens-icon" style="background:${e.color};width:36px;height:36px;font-size:16px"><i class="ti ti-music"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600">${e.name}</div>
-            <div style="font-size:11px;color:var(--t2)">${e.sub||''} · ${e.term||''}</div>
-          </div>
-          ${actionBtn}
-        </div>`;
-      }).join('');
-    }
-  }
-}
-
-async function requestJoin(ensIdx) {
-  const e = ensembles[ensIdx];
-  if (e.myRole) { showToast('You already have access to ' + e.name + '.'); return; }
-  if (dataMode === 'live') {
-    const { error } = await sb.from('ensemble_members').insert({
-      ensemble_id: e.id, user_id: authSession.user.id,
-      email: currentStudent.email, name: currentStudent.name,
-      role: 'student', status: 'pending',
-    });
-    if (error) { showToast('Could not send request: ' + error.message); return; }
-    e.joinRequests = [{ name: currentStudent.name, email: currentStudent.email, status: 'pending' }];
-    // Fire-and-forget — the teacher wouldn't otherwise know a request is
-    // sitting in their Roster tab until they happen to open the app.
-    if (e.email) {
-      sendEmail(e.email, `${currentStudent.name} wants to join ${e.name}`,
-        `${currentStudent.name} (${currentStudent.email}) requested to join ${e.name} on Call Time.\n\nOpen Call Time > Roster to approve or deny the request.`);
-    }
-  } else {
-    if(!e.joinRequests) e.joinRequests = [];
-    e.joinRequests.push({
-      name: currentStudent.name,
-      initials: currentStudent.initials,
-      email: currentStudent.email,
-      role: '',
-      status: 'pending',
-    });
-  }
-  renderStudentLanding();
-  showToast('Join request sent to ' + e.name + '!');
 }
 
 async function enterEnsembleAsStudent(idx) {
@@ -5027,6 +5077,35 @@ async function enterEnsembleAsStudent(idx) {
   if (dataMode === 'live') await renderTodayCard();
 }
 
+// Handles an invite-link visit: copyInviteLink() encodes a URL back to this
+// app with ?join=<ensembleId>. Opening a teacher's invite link while signed
+// in *is* the authorization — no more approval queue (see migration
+// 0012) — so this adds the account as an active student member the moment
+// it lands, then drops them straight into that ensemble.
+async function handleJoinDeepLink() {
+  if (dataMode !== 'live') return false;
+  const params = new URLSearchParams(window.location.search);
+  const ensembleId = params.get('join');
+  if (!ensembleId) return false;
+  history.replaceState(null, '', window.location.pathname); // consume the param so a refresh doesn't re-trigger this
+  let idx = ensembles.findIndex(en => en.id === ensembleId);
+  if (idx === -1) { showToast('Could not find that ensemble.'); return false; }
+  if (!ensembles[idx].myRole) {
+    const { error } = await sb.from('ensemble_members').insert({
+      ensemble_id: ensembleId, user_id: authSession.user.id,
+      email: currentStudent.email, name: currentStudent.name,
+      role: 'student', status: 'active',
+    });
+    if (error) { showToast('Could not join: ' + error.message); return false; }
+    await loadEnsemblesFromDB(); // refresh so myRole/enrolledStudentEmails reflect the new row
+    idx = ensembles.findIndex(en => en.id === ensembleId);
+  }
+  const name = ensembles[idx].name;
+  await enterEnsembleAsStudent(idx);
+  showToast('Welcome to ' + name + '!');
+  return true;
+}
+
 // Handles a QR check-in scan: genQR() encodes a real URL back to this app
 // with ?checkin=<eventId>&ensemble=<ensembleId> (live mode only — the demo
 // QR still points at a fake calltime.app domain, matching the original
@@ -5055,8 +5134,8 @@ async function enterEnsemble(idx) {
 
   // Only a teacher of this ensemble can see the full roster and email
   // templates (RLS); fetch everything before rendering so students/
-  // joinRequests/evList/resources/tpls are populated by the time
-  // loadEnsembleContext() copies them onto the global arrays.
+  // evList/resources/tpls are populated by the time loadEnsembleContext()
+  // copies them onto the global arrays.
   if (dataMode === 'live') {
     await Promise.all([
       loadRosterFromDB(e), loadEventsFromDB(e), loadResourcesFromDB(e), loadTemplatesFromDB(e),
@@ -5075,6 +5154,7 @@ async function enterEnsemble(idx) {
     await loadAttendanceForEvent(pickTodayEvent());
     syncGradingSettingsUI(e);
   }
+  syncArchiveButton(e);
 
   // Update topbar
   document.getElementById('topbar-brand').style.display = 'none';
@@ -5082,7 +5162,12 @@ async function enterEnsemble(idx) {
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
   const sel = document.getElementById('ens-select');
-  sel.innerHTML = teacherEnsembles().map(en => { const i = ensembles.indexOf(en);
+  // teacherEnsembles() excludes archived ones — but if the ensemble
+  // currently open *is* archived (reached via the landing page's Archived
+  // list), it still needs to appear here as the selected option.
+  const switcherList = teacherEnsembles();
+  if (e.archivedAt && !switcherList.includes(e)) switcherList.push(e);
+  sel.innerHTML = switcherList.map(en => { const i = ensembles.indexOf(en);
     return `<option value="${i}" ${i===idx?'selected':''}>${en.name}</option>`; }).join('');
   document.getElementById('role-toggle').style.display = 'flex';
 
@@ -5113,9 +5198,13 @@ async function switchEnsemble(val) {
   else await enterEnsemble(parseInt(val));
 }
 
-function goLanding() {
+function goLanding(skipSave) {
   unsubscribeAttendanceRealtime();
-  saveEnsembleContext();
+  // Skipped right after deleteEnsemble(): activeEns() no longer points at
+  // the ensemble that was just on screen (it's gone, and activeEnsIdx has
+  // already been reset by the reload), so saving now would overwrite some
+  // unrelated ensemble's cached local state instead.
+  if (!skipSave) saveEnsembleContext();
   document.getElementById('ensemble-switcher').style.display = 'none';
   document.getElementById('topbar-brand').style.display = 'flex';
   document.getElementById('role-toggle').style.display = lastRole === 'teacher' ? 'flex' : 'none';
@@ -5234,94 +5323,6 @@ async function finishWizard() {
   renderLanding();
   showToast(name + ' created!');
 }
-
-/* JOIN REQUESTS */
-function renderJoinRequests() {
-  const e = activeEns();
-  const pending = (e.joinRequests||[]).filter(r=>r.status==='pending');
-  const sec = document.getElementById('join-requests-section');
-  const list = document.getElementById('join-requests-list');
-  if(!sec || !list) return;
-  if(!pending.length) { sec.style.display='none'; return; }
-  sec.style.display = 'block';
-  list.innerHTML = pending.map((r,i) => `
-    <div style="background:var(--abg);border:.5px solid #FAC775;border-radius:var(--rs);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <div class="avatar" style="width:32px;height:32px;font-size:11px;flex-shrink:0">${r.initials||r.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${r.name}</div>
-        <div style="font-size:11px;color:var(--t2)">${r.email}</div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="btn" style="font-size:12px;padding:5px 10px;color:var(--rd)" onclick="denyJoin('${r.email}')"><i class="ti ti-x"></i>Deny</button>
-        <button class="btn btnp" style="font-size:12px;padding:5px 10px" onclick="approveJoin('${r.email}')"><i class="ti ti-check"></i>Approve</button>
-      </div>
-    </div>`).join('');
-}
-
-async function approveJoin(email) {
-  const e = activeEns();
-  const req = (e.joinRequests||[]).find(r=>r.email===email);
-  if(!req) return;
-  if (dataMode === 'live') {
-    const { error } = await sb.from('ensemble_members')
-      .update({ status: 'active' }).eq('ensemble_id', e.id).eq('email', email);
-    if (error) { showToast('Could not approve: ' + error.message); return; }
-    await loadRosterFromDB(e);
-    loadEnsembleContext();
-    document.getElementById('roster-count').textContent = students.length;
-    renderRoster();
-    sendEmail(email, `You're in! Welcome to ${e.name}`,
-      `Hi ${req.name},\n\nYour request to join ${e.name} on Call Time was approved. Sign in at Call Time to see rehearsal schedules, check in, and more.`);
-  } else {
-    req.status = 'approved';
-    if(!e.enrolledStudentEmails) e.enrolledStudentEmails = [];
-    e.enrolledStudentEmails.push(email);
-    // Add to roster if not already there
-    if(!students.find(s=>s.e===email)) {
-      const i = req.initials || req.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      students.push({n:req.name, i, r:req.role||'Ensemble', e:email, s:'present', t:'—', a:0});
-      e.students = JSON.parse(JSON.stringify(students));
-      document.getElementById('roster-count').textContent = students.length;
-      renderRoster();
-    }
-    renderJoinRequests();
-  }
-  showToast(req.name + ' approved and added to roster!');
-}
-
-async function denyJoin(email) {
-  const e = activeEns();
-  const req = (e.joinRequests||[]).find(r=>r.email===email);
-  if(!req) return;
-  if (dataMode === 'live') {
-    const { error } = await sb.from('ensemble_members')
-      .update({ status: 'denied' }).eq('ensemble_id', e.id).eq('email', email);
-    if (error) { showToast('Could not deny: ' + error.message); return; }
-    await loadRosterFromDB(e);
-    loadEnsembleContext();
-    sendEmail(email, `Update on your ${e.name} request`,
-      `Hi ${req.name},\n\nYour request to join ${e.name} on Call Time was not approved. Reach out to ${e.teacher || 'the director'} if you have questions.`);
-  } else {
-    req.status = 'denied';
-  }
-  renderJoinRequests();
-  showToast('Request denied.');
-}
-
-// Hook renderRoster to also render join requests
-const _origRenderRoster = renderRoster;
-renderRoster = function() {
-  _origRenderRoster();
-  renderJoinRequests();
-};
-
-// Hook switchTab to render join requests when roster tab opens
-const _origSwitchTab2 = switchTab;
-switchTab = function(id, btn) {
-  _origSwitchTab2(id, btn);
-  if(id==='roster') renderJoinRequests();
-};
-
 
 /* NOTES TAB */
 // Loads today's saved pre/post notes into the textareas — called from
@@ -5701,6 +5702,13 @@ function resetToLogin() {
 
 /* BOOT */
 renderLanding();
+// If this page load came from an invite link and the visitor isn't signed
+// in yet, default the login screen's picker to Student — matches what
+// onAuthStateChange forces loginRole to once they actually sign in.
+if (new URLSearchParams(window.location.search).has('join')) {
+  const stuBtn = document.getElementById('role-student-btn');
+  if (stuBtn) selectLoginRole('student');
+}
 </script>
 </body>
 </html>
