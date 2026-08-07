@@ -2219,9 +2219,12 @@ function excCard(ex) {
   const ih  = ex.img
     ? `<img src="${ex.src}" class="exthumb" onclick="openLB('${ex.src}')"/>`
     : '<span style="font-size:12px;color:var(--t3)">No attachment</span>';
+  // ex.id is a real UUID in live mode (a small demo-mode integer only by
+  // coincidence) — must be quoted in the inline handler, or a UUID like
+  // 3fa85f64-5717-... parses as a subtraction expression and throws.
   const ab  = ex.status==='pending'
-    ? `<button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openRev(${ex.id})"><i class="ti ti-clipboard-check"></i>Review</button>`
-    : `<button class="btn" style="font-size:12px;padding:6px 12px" onclick="openRev(${ex.id})"><i class="ti ti-eye"></i>View</button>`;
+    ? `<button class="btn btnp" style="font-size:12px;padding:6px 12px" onclick="openRev('${ex.id}')"><i class="ti ti-clipboard-check"></i>Review</button>`
+    : `<button class="btn" style="font-size:12px;padding:6px 12px" onclick="openRev('${ex.id}')"><i class="ti ti-eye"></i>View</button>`;
   const nb  = ex.note
     ? `<div style="font-size:12px;color:var(--t2);background:var(--s2);padding:6px 10px;border-radius:5px;margin-top:6px"><strong>Note:</strong> ${ex.note}</div>`
     : '';
@@ -2309,6 +2312,7 @@ async function toggleCI(){
       if (error) { showToast('Could not check out: ' + error.message); return; }
     }
     await syncCheckInRing(ev);
+    await updateStudentBadge(activeEns());
     return;
   }
 
@@ -2405,7 +2409,10 @@ async function openExcuseSubmit() {
 }
 
 function openRev(id){
-  const ex=excuses.find(e=>e.id===id);if(!ex)return;curExcId=id;
+  // Loose match: id arrives as a string (quoted in the onclick, since a
+  // live-mode UUID can't safely go in unquoted), but demo-mode excuse ids
+  // are plain numbers — String() puts both sides on equal footing.
+  const ex=excuses.find(e=>String(e.id)===String(id));if(!ex)return;curExcId=ex.id;
   document.getElementById('rev-hdr').innerHTML=`<div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="width:28px;height:28px;font-size:10px">${ex.ini}</div><div><div style="font-size:13px;font-weight:600">${ex.stu}</div><div style="font-size:12px;color:var(--t2)">${ex.ev} · ${ex.dt} · <strong>${ex.type}</strong></div></div></div>`;
   document.getElementById('rev-txt').textContent=ex.txt;
   const att=document.getElementById('rev-att');
@@ -2645,23 +2652,23 @@ function renderRules(){
   el.innerHTML=rules.map(r=>`
     <div class="nrule ${r.on?'':'off'}">
       <div class="rtop">
-        <button class="tog ${r.on?'on':''}" onclick="togRule(${r.id})"></button>
+        <button class="tog ${r.on?'on':''}" onclick="togRule('${r.id}')"></button>
         <span class="rlbl2">${r.lbl}</span>
-        <button class="btn" style="padding:4px 10px;font-size:12px" onclick="delRule(${r.id})"><i class="ti ti-trash" style="font-size:13px;color:var(--rd)"></i></button>
+        <button class="btn" style="padding:4px 10px;font-size:12px" onclick="delRule('${r.id}')"><i class="ti ti-trash" style="font-size:13px;color:var(--rd)"></i></button>
       </div>
       <div class="rtrig">
         <span>Send</span>
-        <select class="rsel" onchange="updRule(${r.id},'trig',this.value)">
+        <select class="rsel" onchange="updRule('${r.id}','trig',this.value)">
           ${trigOpts.map(o=>`<option value="${o.v}"${r.trig===o.v?' selected':''}>${o.l}</option>`).join('')}
         </select>
         ${r.trig==='before_event'||r.trig==='custom'?`
-          <input type="number" min="1" max="999" value="${r.off}" style="width:58px;padding:5px 8px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:13px" onchange="updRule(${r.id},'off',this.value)"/>
-          <select class="rsel" onchange="updRule(${r.id},'unit',this.value)">
+          <input type="number" min="1" max="999" value="${r.off}" style="width:58px;padding:5px 8px;border:.5px solid var(--bd2);border-radius:var(--rs);font-size:13px" onchange="updRule('${r.id}','off',this.value)"/>
+          <select class="rsel" onchange="updRule('${r.id}','unit',this.value)">
             <option value="min"${r.unit==='min'?' selected':''}>min</option>
             <option value="hr"${r.unit==='hr'?' selected':''}>hr</option>
           </select>`:''}
         <span>· template:</span>
-        <select class="rsel" onchange="updRule(${r.id},'tpl',this.value)">
+        <select class="rsel" onchange="updRule('${r.id}','tpl',this.value)">
           ${Object.keys(tpls).map(k => {
           const builtInLabels = {absence:'Absence notice',warning:'Absence warning',failing:'Failing risk',exc_app:'Excuse approved',exc_den:'Excuse denied'};
           const label = builtInLabels[k] || k.replace('custom_','').replace(/_\d+$/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -2683,7 +2690,10 @@ async function loadNotificationRulesFromDB(e) {
 }
 
 async function togRule(id){
-  const r=rules.find(r=>r.id===id); if(!r) return;
+  // Loose match — id arrives as a string (quoted in the onclick, since a
+  // live-mode UUID can't safely go in unquoted), but demo-mode rule ids
+  // are plain numbers.
+  const r=rules.find(r=>String(r.id)===String(id)); if(!r) return;
   r.on=!r.on;
   if (dataMode === 'live') {
     const { error } = await sb.from('notification_rules').update({ enabled: r.on }).eq('id', id);
@@ -2692,7 +2702,7 @@ async function togRule(id){
   renderRules();
 }
 async function updRule(id,k,v){
-  const r=rules.find(r=>r.id===id); if(!r) return;
+  const r=rules.find(r=>String(r.id)===String(id)); if(!r) return;
   r[k]=v;
   if (dataMode === 'live') {
     const colMap = { trig: 'trigger', off: 'offset_value', unit: 'offset_unit', tpl: 'template_key', lbl: 'label' };
@@ -2708,7 +2718,7 @@ async function delRule(id){
     const { error } = await sb.from('notification_rules').delete().eq('id', id);
     if (error) { showToast('Could not delete rule: ' + error.message); return; }
   }
-  rules=rules.filter(r=>r.id!==id);
+  rules=rules.filter(r=>String(r.id)!==String(id));
   renderRules();
 }
 async function addRule(){
@@ -3851,7 +3861,7 @@ function renderResources() {
             <a href="${r.url}" target="_blank" rel="noopener" class="btn btnp" style="font-size:12px;padding:6px 12px;text-decoration:none">
               <i class="ti ti-external-link"></i>Open
             </a>
-            <button class="btn" style="font-size:12px;padding:6px 10px" onclick="deleteResource(${r.id})">
+            <button class="btn" style="font-size:12px;padding:6px 10px" onclick="deleteResource('${r.id}')">
               <i class="ti ti-trash" style="color:var(--rd)"></i>
             </button>
           </div>
@@ -3923,7 +3933,7 @@ async function deleteResource(id) {
     await loadResourcesFromDB(e);
     loadEnsembleContext();
   } else {
-    resources = resources.filter(r=>r.id!==id);
+    resources = resources.filter(r=>String(r.id)!==String(id));
   }
   renderResources();
 }
@@ -5183,6 +5193,31 @@ function syncStudentHeader(e) {
   if (roleEl) roleEl.textContent = e ? e.name : '';
 }
 
+// The "N absences" pill on the student topbar was static HTML — "2
+// absences", the sample Jordan Martinez data — and nothing in live mode
+// ever recomputed it, so every real student saw that same sample number
+// forever regardless of their actual record. Queries this student's own
+// attendance/excuses rows directly (RLS lets an active member read their
+// own rows even though they can't see classmates'), applying the same
+// excused-absences policy gradedAbsences() uses on the teacher's roster.
+async function updateStudentBadge(e) {
+  const badge = document.getElementById('stu-badge');
+  if (!badge) return;
+  if (dataMode !== 'live') {
+    const absCount = students.find(s=>s.n==='Jordan Martinez')?.a || 0;
+    badge.textContent = absCount + ' absence' + (absCount!==1?'s':'');
+    return;
+  }
+  const [{ data: absences }, { data: excusedRows }] = await Promise.all([
+    sb.from('attendance').select('id').eq('ensemble_id', e.id).eq('user_id', authSession.user.id).eq('status', 'absent'),
+    sb.from('excuses').select('id').eq('ensemble_id', e.id).eq('user_id', authSession.user.id).eq('status', 'approved'),
+  ]);
+  const raw = (absences||[]).length;
+  const excused = (excusedRows||[]).length;
+  const count = pol.excludeExcused ? Math.max(0, raw - excused) : raw;
+  badge.textContent = count + ' absence' + (count!==1?'s':'');
+}
+
 function openEditName() {
   const input = document.getElementById('edit-name-input');
   if (input) input.value = currentStudent.name;
@@ -5222,9 +5257,10 @@ async function enterEnsembleAsStudent(idx) {
   const e = ensembles[idx];
 
   // RLS blocks a student from seeing classmates' roster rows, so there's no
-  // loadRosterFromDB() call here — events, resources, and this student's
-  // own excuses (RLS-restricted) are all every active member may read.
-  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e)]);
+  // loadRosterFromDB() call here — events, resources, this student's own
+  // excuses, and the grading policy (needed for updateStudentBadge()'s
+  // excused-absences math below) are all every active member may read.
+  if (dataMode === 'live') await Promise.all([loadEventsFromDB(e), loadResourcesFromDB(e), loadExcusesFromDB(e), loadGradingPolicyFromDB(e)]);
 
   loadEnsembleContext();
 
@@ -5234,6 +5270,7 @@ async function enterEnsembleAsStudent(idx) {
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
   syncStudentHeader(e);
+  await updateStudentBadge(e);
 
   // Student dropdown: enrolled ensembles + option to go back to landing
   const enrolledStu = ensembles.filter(en =>
