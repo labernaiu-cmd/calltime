@@ -100,6 +100,15 @@ folder in order (or use the Supabase CLI: `supabase db push`):
     that let a student self-insert a `pending` row for one that allows
     `active` instead. See `copyInviteLink()`/`handleJoinDeepLink()` in
     `calltime.html`.
+13. `migrations/0013_student_name_edit.sql` — lets a student update their
+    own `ensemble_members` row (used for the pencil icon next to their name
+    in the student topbar — see `saveEditName()`), constrained via
+    `WITH CHECK` to keep `role='student'`/`status='active'` so it can't be
+    used to self-promote to teacher or reactivate a removed membership.
+    Needed because magic-link sign-in collects no name by default, so a
+    student who joined via invite link before this migration (or before
+    the login screen's name field existed) would otherwise be stuck with
+    whatever `nameFromEmail()` guessed from their email address.
 
 ## 3. Enable email auth
 

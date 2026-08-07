@@ -242,6 +242,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
 
       <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Full name</label>
+        <input type="text" id="login-name" placeholder="Jordan Martinez"
+          style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:14px;outline:none;transition:border .15s"
+          onfocus="this.style.borderColor='rgba(175,169,236,.8)'"
+          onblur="this.style.borderColor='rgba(255,255,255,.15)'"
+          onkeydown="if(event.key==='Enter')sendMagicLink()"/>
+      </div>
+
+      <div style="margin-bottom:12px">
         <label style="font-size:12px;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Email address</label>
         <input type="email" id="login-email" placeholder="you@william.jewell.edu"
           style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:14px;outline:none;transition:border .15s"
@@ -897,10 +906,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <!-- STUDENT TOPBAR -->
   <div style="background:var(--sf);border-bottom:.5px solid var(--bd);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:56px;z-index:10">
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="avatar" style="width:32px;height:32px;font-size:11px">JM</div>
+      <div class="avatar" style="width:32px;height:32px;font-size:11px" id="stu-avatar">JM</div>
       <div>
-        <div style="font-size:14px;font-weight:600;line-height:1.2">Jordan Martinez</div>
-        <div style="font-size:11px;color:var(--t2)">Lead · Into the Woods</div>
+        <div style="font-size:14px;font-weight:600;line-height:1.2;display:flex;align-items:center;gap:6px">
+          <span id="stu-name-display">Jordan Martinez</span>
+          <i class="ti ti-pencil" style="font-size:13px;color:var(--t3);cursor:pointer" onclick="openEditName()" title="Edit your name"></i>
+        </div>
+        <div style="font-size:11px;color:var(--t2)" id="stu-role-line">Lead · Into the Woods</div>
       </div>
     </div>
     <span class="badge ba" id="stu-badge">2 absences</span>
@@ -1309,6 +1321,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="mact">
       <button class="btn" onclick="closeM('student')">Cancel</button>
       <button class="btn btnp" onclick="addStudent()"><i class="ti ti-check"></i>Add &amp; send invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Edit your name (student self-service — fixes a name that got
+     auto-derived from an email address at invite-link join time) -->
+<div class="mbg" id="m-edit-name" onclick="closeMBG('edit-name',event)">
+  <div class="mbox">
+    <div class="mtitle"><i class="ti ti-user-edit"></i>Your name</div>
+    <div class="field"><label>Full name</label><input type="text" id="edit-name-input" placeholder="First Last"/></div>
+    <div class="mact">
+      <button class="btn" onclick="closeM('edit-name')">Cancel</button>
+      <button class="btn btnp" onclick="saveEditName()"><i class="ti ti-check"></i>Save</button>
     </div>
   </div>
 </div>
@@ -1956,11 +1981,19 @@ async function sendEmail(to, subject, body, from) {
 }
 
 async function sendMagicLink() {
+  const nameInput = document.getElementById('login-name');
   const emailInput = document.getElementById('login-email');
   const errEl = document.getElementById('login-error');
   const btn = document.getElementById('send-magic-link-btn');
+  const name = nameInput.value.trim();
   const email = emailInput.value.trim();
   errEl.style.display = 'none';
+  if(!name) {
+    nameInput.style.borderColor = 'rgba(226,75,74,.8)';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = 'rgba(255,255,255,.15)';
   if(!email || !email.includes('@')) {
     emailInput.style.borderColor = 'rgba(226,75,74,.8)';
     emailInput.focus();
@@ -1980,8 +2013,14 @@ async function sendMagicLink() {
     // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
     // from a QR scan — see genQR()/handleCheckinDeepLink()) so it survives
     // the magic-link round trip instead of being dropped here before the
-    // email even goes out.
-    options: { emailRedirectTo: window.location.origin + window.location.pathname + window.location.search }
+    // email even goes out. `data.name` becomes user_metadata.name, read
+    // back in onAuthStateChange — otherwise a student's name on the roster
+    // ends up auto-derived from their email (see nameFromEmail()) since
+    // magic-link sign-in collects nothing else about who they are.
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname + window.location.search,
+      data: { name },
+    }
   });
   btn.disabled = false;
   btn.style.opacity = '1';
@@ -5040,6 +5079,51 @@ function renderStudentLanding(skipAutoEnter) {
   }
 }
 
+// Reflects currentStudent + the active ensemble on the student topbar —
+// called whenever a student enters an ensemble and right after
+// saveEditName() changes their name.
+function syncStudentHeader(e) {
+  const av = document.getElementById('stu-avatar');
+  const nameEl = document.getElementById('stu-name-display');
+  const roleEl = document.getElementById('stu-role-line');
+  if (av) av.textContent = currentStudent.initials;
+  if (nameEl) nameEl.textContent = currentStudent.name;
+  if (roleEl) roleEl.textContent = e ? e.name : '';
+}
+
+function openEditName() {
+  const input = document.getElementById('edit-name-input');
+  if (input) input.value = currentStudent.name;
+  openM('edit-name');
+}
+
+// Fixes a name that got auto-derived from an email address (see
+// nameFromEmail()) — e.g. joining via invite link before the login
+// screen's name field existed. Updates the signed-in account's own name
+// everywhere it's stored: Supabase auth (so future sign-ins keep it) and
+// every one of this user's *student* rows (so every teacher's roster
+// picks it up) — deliberately excludes any row where they're a teacher,
+// since migration 0013's RLS policy only allows self-updates that keep
+// role='student', and touching a teacher row in the same statement would
+// fail that check and abort the whole update.
+async function saveEditName() {
+  const input = document.getElementById('edit-name-input');
+  const name = input.value.trim();
+  if (!name) { input.style.borderColor = 'rgba(226,75,74,.8)'; return; }
+  input.style.borderColor = '';
+  currentStudent.name = name;
+  currentStudent.initials = initialsFromName(name);
+  if (dataMode === 'live') {
+    await sb.auth.updateUser({ data: { name } });
+    const { error } = await sb.from('ensemble_members').update({ name })
+      .eq('user_id', authSession.user.id).eq('role', 'student');
+    if (error) { showToast('Could not save: ' + error.message); return; }
+  }
+  syncStudentHeader(activeEns());
+  closeM('edit-name');
+  showToast('Name updated!');
+}
+
 async function enterEnsembleAsStudent(idx) {
   lastRole = 'student';
   activeEnsIdx = idx;
@@ -5057,6 +5141,7 @@ async function enterEnsembleAsStudent(idx) {
   const sw = document.getElementById('ensemble-switcher');
   sw.style.display = 'flex';
   document.getElementById('ens-color-dot').style.background = e.color;
+  syncStudentHeader(e);
 
   // Student dropdown: enrolled ensembles + option to go back to landing
   const enrolledStu = ensembles.filter(en =>
@@ -5698,6 +5783,7 @@ function resetToLogin() {
   document.getElementById('role-toggle').style.display = 'none';
   document.getElementById('login-card').style.display = 'block';
   document.getElementById('check-email-card').style.display = 'none';
+  document.getElementById('login-name').value = '';
   document.getElementById('login-email').value = '';
   document.getElementById('login-error').style.display = 'none';
   loginRole = 'teacher';
