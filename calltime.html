@@ -1338,6 +1338,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- MODAL: Edit student (teacher-side — fixes a name/email/role without
+     waiting on the student to do it themselves via the pencil in their
+     own topbar; see openEditStudent()/saveEditStudent()) -->
+<div class="mbg" id="m-edit-student" onclick="closeMBG('edit-student',event)">
+  <div class="mbox">
+    <div class="mtitle"><i class="ti ti-user-edit"></i>Edit student</div>
+    <input type="hidden" id="edit-s-id"/>
+    <div class="field"><label>Full name</label><input type="text" id="edit-s-name" placeholder="First Last"/></div>
+    <div class="field"><label>Email</label><input type="email" id="edit-s-email" placeholder="student@school.edu"/></div>
+    <div class="field"><label>Role / part</label><input type="text" id="edit-s-role" placeholder="e.g. Lead, Ensemble, Stage crew"/></div>
+    <div class="mact" style="justify-content:space-between">
+      <button class="btn" style="color:var(--rd)" onclick="removeStudent()"><i class="ti ti-user-x"></i>Remove from roster</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeM('edit-student')">Cancel</button>
+        <button class="btn btnp" onclick="saveEditStudent()"><i class="ti ti-check"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Import roster -->
 <div class="mbg" id="m-import" onclick="closeMBG('import',event)">
   <div class="mbox" style="width:520px">
@@ -2130,9 +2150,12 @@ function renderAll(){
 
 function renderRoster(){
   document.getElementById('roster-list').innerHTML=students.map(s=>{
+    const editBtn = s.memberId
+      ? `<i class="ti ti-pencil" style="font-size:13px;color:var(--t3);cursor:pointer;margin-left:6px" onclick="event.stopPropagation();openEditStudent('${s.memberId}')" title="Edit student"></i>`
+      : '';
     const head = `<div style="display:flex;align-items:center;gap:8px">
         <div class="avatar">${s.i}</div>
-        <div><div style="font-size:13px;font-weight:500">${s.n}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
+        <div><div style="font-size:13px;font-weight:500;display:flex;align-items:center">${s.n}${editBtn}</div><div style="font-size:11px;color:var(--t3)">${s.e||''}</div></div>
       </div>
       <div style="color:var(--t2)">${s.r}</div>`;
 
@@ -2946,6 +2969,75 @@ async function addStudent() {
   document.getElementById('new-s-role').value='';
   document.getElementById('new-s-parent').value='';
   showToast(n + ' added' + (dataMode==='live' && email ? ' — invite sent!' : '.'));
+}
+
+// Teacher-side fix for a student's name/email/role — most useful for a
+// name that got auto-derived from an email address (see nameFromEmail())
+// before the student either filled in the login screen's name field or
+// used the pencil in their own topbar (saveEditName()) to fix it
+// themselves. Teachers already have full UPDATE rights on their own
+// ensemble's ensemble_members rows (existing RLS), so no new migration
+// was needed for this one.
+function openEditStudent(memberId) {
+  const s = students.find(st => String(st.memberId) === String(memberId));
+  if (!s) return;
+  document.getElementById('edit-s-id').value = memberId;
+  document.getElementById('edit-s-name').value = s.n || '';
+  document.getElementById('edit-s-email').value = s.e || '';
+  document.getElementById('edit-s-role').value = s.r || '';
+  openM('edit-student');
+}
+
+async function saveEditStudent() {
+  const memberId = document.getElementById('edit-s-id').value;
+  const n = document.getElementById('edit-s-name').value.trim();
+  const email = document.getElementById('edit-s-email').value.trim();
+  const r = document.getElementById('edit-s-role').value.trim() || 'Ensemble';
+  if (!n) { alert('Please enter a name.'); return; }
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensemble_members')
+      .update({ name: n, email: email || null, part: r }).eq('id', memberId);
+    if (error) { showToast('Could not save: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    const s = students.find(st => String(st.memberId) === String(memberId));
+    if (s) { s.n = n; s.i = initialsFromName(n); s.e = email; s.r = r; }
+  }
+  renderRoster();
+  closeM('edit-student');
+  showToast('Student updated!');
+}
+
+// Drops a student from this ensemble's roster (e.g. they left the class).
+// Their past attendance/excuse rows aren't deleted — those key off
+// user_id + ensemble_id, not this ensemble_members row, so removing it
+// just takes them out of the active roster, grading, and reports going
+// forward, not out of the historical record.
+async function removeStudent() {
+  const memberId = document.getElementById('edit-s-id').value;
+  const s = students.find(st => String(st.memberId) === String(memberId));
+  if (!s) return;
+  if (!confirm(`Remove ${s.n} from the roster? Their past attendance and excuse history stays on record, but they'll no longer count toward grading or reports here. This can't be undone from this screen — they'd need a new invite link to rejoin.`)) return;
+
+  if (dataMode === 'live') {
+    const e = activeEns();
+    const { error } = await sb.from('ensemble_members').delete().eq('id', memberId);
+    if (error) { showToast('Could not remove: ' + error.message); return; }
+    await loadRosterFromDB(e);
+    loadEnsembleContext();
+  } else {
+    // students is declared `const` — mutate in place rather than reassign.
+    const kept = students.filter(st => String(st.memberId) !== String(memberId));
+    students.length = 0;
+    students.push(...kept);
+  }
+  document.getElementById('roster-count').textContent = students.length;
+  renderRoster();
+  closeM('edit-student');
+  showToast(s.n + ' removed from roster.');
 }
 
 function showToast(msg) {
