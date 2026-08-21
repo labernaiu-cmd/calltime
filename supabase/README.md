@@ -113,9 +113,35 @@ folder in order (or use the Supabase CLI: `supabase db push`):
 ## 3. Enable email auth
 
 **Authentication → Providers → Email** should already be on by default.
-No SMTP configuration is needed for magic links — Supabase sends them.
-(Routing outbound mail through the Jewell Office 365 account is a later,
-optional step — see spec §3.3.)
+(For SMTP — routing sign-in emails through a real account instead of
+Supabase's own rate-limited sender — see the root `README.md`'s Email
+section; this build uses Gmail SMTP.)
+
+**Authentication → Email Templates → Magic Link** needs one edit: replace
+the default clickable-link template with one that shows `{{ .Token }}` (a
+6-digit code) as plain text instead of `{{ .ConfirmationURL }}` as a link
+— e.g.:
+
+```
+Your Call Time sign-in code is: {{ .Token }}
+
+This code expires shortly. If you didn't request this, you can ignore this email.
+```
+
+This isn't cosmetic — it's required for sign-in to work reliably.
+Institutional email (Office 365 Safe Links/ATP and similar corporate mail
+security scanners) commonly auto-visits every link in an incoming message
+to scan it, which silently consumes a one-time magic-link token before the
+actual recipient ever clicks it — so anyone on a scanned inbox would see
+"Email link is invalid or has expired" on *every* sign-in attempt, with no
+way to fix it from the app side. `calltime.html`'s login flow (see
+`sendMagicLink()`/`verifyOtpCode()`) accordingly never relies on the link
+at all — it calls `signInWithOtp()` then `verifyOtp({ email, token, type:
+'email' })` with the code the user types in. If the template still
+contains `{{ .ConfirmationURL }}` *in addition to* `{{ .Token }}`, a
+scanner visiting that link will still burn the shared one-time-password
+record and invalidate the code too — the link needs to be gone from the
+template entirely, not just de-emphasized.
 
 ## 4. Wire the frontend
 
@@ -130,10 +156,10 @@ and replace both placeholders with the values from step 1. The anon key
 is safe to ship in client-side code — it has no privileges beyond what
 the RLS policies above grant it.
 
-Also add your deployed URL (or `http://localhost:...` while developing)
-to **Authentication → URL Configuration → Redirect URLs**, since magic
-links only redirect back to allow-listed URLs. Use a wildcard suffix (e.g.
-`https://yourapp.vercel.app/calltime.html*`) rather than the bare URL —
-the QR check-in flow appends `?checkin=<eventId>&ensemble=<ensembleId>` to
-the redirect target (see `handleCheckinDeepLink()` in `calltime.html`),
-and an exact-match entry without the `*` will reject that redirect.
+There's no Redirect URLs allow-list entry to add for sign-in itself —
+since it's code-based (§3), the user never leaves the page, so nothing
+ever redirects back. The QR check-in link (`?checkin=<eventId>&ensemble=
+<ensembleId>`, see `handleCheckinDeepLink()`) and ensemble invite link
+(`?join=<ensembleId>`, see `handleJoinDeepLink()`) aren't Supabase
+redirects either — they're plain URLs a teacher shares directly, opened
+like any other link.

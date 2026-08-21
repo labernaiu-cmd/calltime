@@ -1,7 +1,9 @@
 # Call Time
 
-Rehearsal attendance management for performing ensembles — magic-link auth,
-real-time check-in/out, geofencing, and email notifications, all on
+Rehearsal attendance management for performing ensembles — passwordless
+email sign-in (a 6-digit code, not a clickable link — see
+`supabase/README.md` §3 for why), real-time check-in/out, geofencing, and
+email notifications, all on
 Supabase + Vercel + Gmail SMTP. See `calltime-spec.md` for the original
 technical handoff this was built from (it specs Resend for email; this
 build sends through Gmail SMTP instead — see step 2 below for why).
@@ -10,8 +12,8 @@ The whole frontend is one file, `calltime.html` — no build step. It runs in
 two modes:
 - **Demo mode** ("Skip for now" on the login screen) — the original
   hardcoded mock data, no network calls, works with zero setup.
-- **Live mode** (a real magic-link sign-in) — backed by Supabase for
-  everything below.
+- **Live mode** (a real sign-in, via emailed code) — backed by Supabase
+  for everything below.
 
 ## Setup, in order
 
@@ -50,7 +52,7 @@ number, to keep what's actually transmitted minimal.
    environment variables — see step 4 below. Gmail's sending limit is
    ~500/day on a personal account, ~2000/day on Workspace — plenty for a
    single ensemble program.
-4. If you're also routing Supabase's magic-link auth emails through Gmail
+4. If you're also routing Supabase's sign-in code emails through Gmail
    (see `supabase/README.md` §3), you can reuse the same app password
    there — it's the same credential, just configured in two different
    places (Supabase's dashboard vs. Vercel's env vars).
@@ -136,9 +138,10 @@ deploy — if you add these after your first `vercel --prod`, redeploy (or
 push a commit) for them to take effect.
 
 `vercel.json` rewrites `/` to `calltime.html` so you don't need to rename
-the file to `index.html`. After deploying, add the deployed URL to
-Supabase's **Authentication → URL Configuration → Redirect URLs** (magic
-links only redirect to allow-listed URLs) — see `supabase/README.md` §4.
+the file to `index.html`. Sign-in is code-based, not a clickable magic
+link (see `supabase/README.md` §3 for why), so there's no redirect URL to
+allow-list for it — nothing to add to Supabase's URL Configuration for
+this step.
 
 ## Known gaps
 

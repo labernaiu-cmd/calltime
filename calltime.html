@@ -262,7 +262,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
       <button id="send-magic-link-btn" onclick="sendMagicLink()" style="width:100%;padding:12px;background:#534AB7;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px"
         onmouseover="this.style.background='#3C3489'" onmouseout="this.style.background='#534AB7'">
-        <i class="ti ti-send"></i>Send sign-in link
+        <i class="ti ti-send"></i>Send sign-in code
       </button>
 
       <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.08);text-align:center;font-size:12px;color:rgba(255,255,255,.35)">
@@ -270,18 +270,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
     </div>
 
-    <!-- Check email card (hidden initially) -->
+    <!-- Check email card (hidden initially) — a 6-digit code to type in,
+         not a clickable link. Institutional email (Office 365 Safe Links,
+         etc.) commonly auto-visits every link in a message to scan it,
+         which silently burns a one-time magic-link token before the human
+         ever clicks it — a code sidesteps that entirely since there's
+         nothing for a scanner to visit. See verifyOtpCode() below. -->
     <div id="check-email-card" style="display:none;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:2rem;width:100%;max-width:380px;backdrop-filter:blur(20px);text-align:center">
       <div style="width:56px;height:56px;background:rgba(83,74,183,.4);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
         <i class="ti ti-mail-check" style="font-size:28px;color:#AFA9EC"></i>
       </div>
-      <div style="font-size:16px;font-weight:600;color:#fff;margin-bottom:8px">Check your email</div>
-      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:1.5rem;line-height:1.6">
-        We sent a sign-in link to<br>
+      <div style="font-size:16px;font-weight:600;color:#fff;margin-bottom:8px">Enter your code</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:1.25rem;line-height:1.6">
+        We sent a 6-digit code to<br>
         <strong style="color:rgba(255,255,255,.8)" id="login-email-confirm"></strong>
       </div>
-      <div style="font-size:12px;color:rgba(255,255,255,.3);margin-bottom:1.5rem">
-        The link expires in 15 minutes.<br>You can close this tab after clicking it.
+      <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" id="login-otp" placeholder="123456"
+        style="width:100%;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:22px;letter-spacing:.3em;text-align:center;outline:none;margin-bottom:10px;box-sizing:border-box"
+        onfocus="this.style.borderColor='rgba(175,169,236,.8)'"
+        onblur="this.style.borderColor='rgba(255,255,255,.15)'"
+        onkeydown="if(event.key==='Enter')verifyOtpCode()"/>
+      <div id="otp-error" style="display:none;font-size:12px;color:#F4A6A5;margin-bottom:10px"></div>
+      <button id="verify-otp-btn" onclick="verifyOtpCode()" style="width:100%;padding:12px;background:#534AB7;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px">
+        <i class="ti ti-check"></i> Verify &amp; sign in
+      </button>
+      <div style="font-size:12px;color:rgba(255,255,255,.3);margin-bottom:1.25rem">
+        Code expires in a few minutes. Didn't get it? Check spam, or go back and resend.
       </div>
       <button onclick="bypassLogin()" style="width:100%;padding:11px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px">
         <i class="ti ti-player-skip-forward" style="vertical-align:-2px"></i> Skip for now (demo mode)
@@ -2017,6 +2031,10 @@ async function sendEmail(to, subject, body, from) {
   }
 }
 
+// Set by sendMagicLink() once the code's been sent, read by verifyOtpCode()
+// below — verifyOtp() needs the email back alongside the typed code.
+let pendingLoginEmail = '';
+
 async function sendMagicLink() {
   const nameInput = document.getElementById('login-name');
   const emailInput = document.getElementById('login-email');
@@ -2044,20 +2062,20 @@ async function sendMagicLink() {
   }
   btn.disabled = true;
   btn.style.opacity = '.6';
-  localStorage.setItem('ct_login_role', loginRole); // read back in onAuthStateChange after the redirect
+  localStorage.setItem('ct_login_role', loginRole); // read back in onAuthStateChange once verifyOtpCode() signs in
   const { error } = await sb.auth.signInWithOtp({
     email,
-    // Keep the query string (e.g. ?checkin=<eventId>&ensemble=<ensembleId>
-    // from a QR scan — see genQR()/handleCheckinDeepLink()) so it survives
-    // the magic-link round trip instead of being dropped here before the
-    // email even goes out. `data.name` becomes user_metadata.name, read
-    // back in onAuthStateChange — otherwise a student's name on the roster
-    // ends up auto-derived from their email (see nameFromEmail()) since
-    // magic-link sign-in collects nothing else about who they are.
-    options: {
-      emailRedirectTo: window.location.origin + window.location.pathname + window.location.search,
-      data: { name },
-    }
+    // `data.name` becomes user_metadata.name, read back in
+    // onAuthStateChange — otherwise a student's name on the roster ends up
+    // auto-derived from their email (see nameFromEmail()) since sign-in
+    // otherwise collects nothing else about who they are. No
+    // emailRedirectTo here — the user never leaves this tab; they type the
+    // code Supabase emails them into login-otp below (see verifyOtpCode()),
+    // deliberately not a clickable link, since institutional email
+    // security scanners (Office 365 Safe Links etc.) commonly auto-visit
+    // every link in a message, silently burning a one-time link token
+    // before the human ever gets to click it themselves.
+    options: { data: { name } },
   });
   btn.disabled = false;
   btn.style.opacity = '1';
@@ -2066,9 +2084,41 @@ async function sendMagicLink() {
     errEl.style.display = 'block';
     return;
   }
+  pendingLoginEmail = email;
   document.getElementById('login-email-confirm').textContent = email;
+  document.getElementById('login-otp').value = '';
+  document.getElementById('otp-error').style.display = 'none';
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('check-email-card').style.display = 'block';
+  document.getElementById('login-otp').focus();
+}
+
+async function verifyOtpCode() {
+  const codeInput = document.getElementById('login-otp');
+  const errEl = document.getElementById('otp-error');
+  const btn = document.getElementById('verify-otp-btn');
+  const code = codeInput.value.trim();
+  errEl.style.display = 'none';
+  if (!code) {
+    codeInput.style.borderColor = 'rgba(226,75,74,.8)';
+    codeInput.focus();
+    return;
+  }
+  codeInput.style.borderColor = 'rgba(255,255,255,.15)';
+  btn.disabled = true;
+  btn.style.opacity = '.6';
+  // On success this sets the session internally, which fires
+  // onAuthStateChange('SIGNED_IN', ...) — that listener (above) does the
+  // rest: loadEnsemblesFromDB(), enterApp(), resuming a ?join=/?checkin=
+  // deep link if the page was opened from one. Nothing further needed here.
+  const { error } = await sb.auth.verifyOtp({ email: pendingLoginEmail, token: code, type: 'email' });
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    codeInput.focus();
+  }
 }
 
 async function signOut() {
@@ -6012,7 +6062,10 @@ function resetToLogin() {
   document.getElementById('check-email-card').style.display = 'none';
   document.getElementById('login-name').value = '';
   document.getElementById('login-email').value = '';
+  document.getElementById('login-otp').value = '';
   document.getElementById('login-error').style.display = 'none';
+  document.getElementById('otp-error').style.display = 'none';
+  pendingLoginEmail = '';
   loginRole = 'teacher';
   selectLoginRole('teacher');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('show'));
