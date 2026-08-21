@@ -2107,11 +2107,21 @@ async function verifyOtpCode() {
   codeInput.style.borderColor = 'rgba(255,255,255,.15)';
   btn.disabled = true;
   btn.style.opacity = '.6';
-  // On success this sets the session internally, which fires
-  // onAuthStateChange('SIGNED_IN', ...) — that listener (above) does the
-  // rest: loadEnsemblesFromDB(), enterApp(), resuming a ?join=/?checkin=
-  // deep link if the page was opened from one. Nothing further needed here.
-  const { error } = await sb.auth.verifyOtp({ email: pendingLoginEmail, token: code, type: 'email' });
+  // Which `type` redeems a signInWithOtp() code isn't consistent: a
+  // returning user's code verifies as 'email', but a genuinely first-time
+  // sign-in (signInWithOtp() implicitly creates the account) files its
+  // token as a signup confirmation instead, and 'magiclink' is the older
+  // type name for the same "existing user, passwordless" case on some
+  // Supabase/GoTrue versions. A wrong-type lookup is just a clean
+  // "not found," not a destructive one, so trying each in turn — instead
+  // of guessing one and failing outright — is the safe way to cover
+  // "brand new account" and "returning account" without knowing up front
+  // which this is.
+  let error = null;
+  for (const type of ['email', 'magiclink', 'signup']) {
+    ({ error } = await sb.auth.verifyOtp({ email: pendingLoginEmail, token: code, type }));
+    if (!error) break;
+  }
   btn.disabled = false;
   btn.style.opacity = '1';
   if (error) {
