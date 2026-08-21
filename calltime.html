@@ -2107,21 +2107,13 @@ async function verifyOtpCode() {
   codeInput.style.borderColor = 'rgba(255,255,255,.15)';
   btn.disabled = true;
   btn.style.opacity = '.6';
-  // Which `type` redeems a signInWithOtp() code isn't consistent: a
-  // returning user's code verifies as 'email', but a genuinely first-time
-  // sign-in (signInWithOtp() implicitly creates the account) files its
-  // token as a signup confirmation instead, and 'magiclink' is the older
-  // type name for the same "existing user, passwordless" case on some
-  // Supabase/GoTrue versions. A wrong-type lookup is just a clean
-  // "not found," not a destructive one, so trying each in turn — instead
-  // of guessing one and failing outright — is the safe way to cover
-  // "brand new account" and "returning account" without knowing up front
-  // which this is.
-  let error = null;
-  for (const type of ['email', 'magiclink', 'signup']) {
-    ({ error } = await sb.auth.verifyOtp({ email: pendingLoginEmail, token: code, type }));
-    if (!error) break;
-  }
+  // Reverted the multi-type retry this briefly had: Supabase Auth Logs
+  // showed three /auth/v1/verify calls per click, all failing 403 — firing
+  // three verification attempts at one code is a plausible way to either
+  // burn the code on the first (wrong-type) try or trip Supabase's own
+  // rate limit on token verification outright. One clean attempt, per the
+  // documented type for a signInWithOtp() code.
+  const { error } = await sb.auth.verifyOtp({ email: pendingLoginEmail, token: code, type: 'email' });
   btn.disabled = false;
   btn.style.opacity = '1';
   if (error) {
