@@ -350,7 +350,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="card" style="margin-bottom:14px;border-left:3px solid var(--pu)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px">
         <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--t2);margin-bottom:3px">Today's event</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--t2);margin-bottom:3px" id="today-event-label">Today's event</div>
           <div style="font-size:20px;font-weight:700;color:var(--tx)" id="today-event-name">Main Stage Rehearsal</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -936,10 +936,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="card tnight" style="margin-bottom:14px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px">
           <div>
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--pu);margin-bottom:3px">Tonight</div>
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--pu);margin-bottom:3px" id="stu-today-label">Tonight</div>
             <div style="font-size:17px;font-weight:700" id="stu-today-name">Main Stage Rehearsal</div>
           </div>
-          <span class="badge bg" style="margin-top:4px">Tonight</span>
+          <span class="badge bg" style="margin-top:4px" id="stu-today-badge">Tonight</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
           <div style="background:var(--s2);border-radius:var(--rs);padding:8px 10px">
@@ -1496,12 +1496,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div style="font-size:13px;font-weight:600;color:var(--tx)">To: All cast &amp; crew</div>
         <div style="font-size:12px;color:var(--t2);margin-top:2px">14 students · <span id="rem-unreached">5 haven't checked in yet</span></div>
       </div>
-      <div style="display:flex;gap:6px">
-        <button class="chip on" data-v="all" onclick="selChip(this,'rem-to');updateReminderTo(this.dataset.v)" id="rem-to-chips">All students</button>
+      <div style="display:flex;gap:6px" id="rem-to">
+        <button class="chip on" data-v="all" onclick="selChip(this,'rem-to');updateReminderTo(this.dataset.v)">All students</button>
         <button class="chip" data-v="absent" onclick="selChip(this,'rem-to');updateReminderTo(this.dataset.v)">Not checked in</button>
       </div>
     </div>
-    <div id="rem-to-chips" style="display:none"></div>
 
     <!-- Event details form — drives the email body -->
     <div style="font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Event details</div>
@@ -1943,6 +1942,24 @@ if (!SUPABASE_CONFIGURED) {
 }
 
 let authSession = null; // the current Supabase auth session, kept in sync by onAuthStateChange
+
+// A failed/expired magic link redirects back here with
+// #error=...&error_code=...&error_description=... instead of a session —
+// previously nothing read it, so clicking a stale or already-used link
+// just silently landed back on the blank login screen with no indication
+// anything had gone wrong, which looked exactly like the link doing
+// nothing at all.
+(function showAuthLinkError() {
+  if (!window.location.hash.includes('error=')) return;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const desc = params.get('error_description');
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  const errEl = document.getElementById('login-error');
+  if (errEl) {
+    errEl.textContent = (desc || 'That sign-in link is invalid or has expired.') + ' Request a new one below.';
+    errEl.style.display = 'block';
+  }
+})();
 
 if (sb) {
   sb.auth.onAuthStateChange(async (event, newSession) => {
@@ -3272,6 +3289,9 @@ function fmt12(timeVal) {
 }
 
 function buildReminderEmail() {
+  const e = activeEns();
+  const teacherName = (e && e.teacher) || 'Your director';
+  const checkinUrl = window.location.origin + window.location.pathname;
   const calltime = fmt12(document.getElementById('rem-calltime').value);
   const start    = fmt12(document.getElementById('rem-start').value);
   const venue    = document.getElementById('rem-venue').value;
@@ -3300,10 +3320,10 @@ ${musicLines.join('\n') || '  (program TBD)'}
 ${notes ? '\nNotes:\n' + notes : ''}
 
 Please check in using Call Time when you arrive:
-👉 https://calltime.app/checkin
+👉 ${checkinUrl}
 
 See you tonight!
-— Ms. Rivera`;
+— ${teacherName}`;
 
   document.getElementById('rem-body').value = body;
 }
@@ -4025,6 +4045,22 @@ async function renderTodayCard() {
   if (dataMode !== 'live') return;
   const ev = pickTodayEvent();
   await loadRehearsalNotesForEvent(ev);
+
+  // pickTodayEvent() returns today's event if there is one, otherwise the
+  // soonest upcoming one — but the card's heading was hardcoded to "Today's
+  // event"/"Tonight" regardless, so a rehearsal three days out still read
+  // as happening today. Swap the label based on which case this actually is.
+  const isToday = ev && ev.dateObj && (() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(ev.dateObj); d.setHours(0,0,0,0);
+    return d.getTime() === today.getTime();
+  })();
+  const todayLabel = document.getElementById('today-event-label');
+  if (todayLabel) todayLabel.textContent = ev ? (isToday ? "Today's event" : 'Next event') : "Today's event";
+  const stuLabel = document.getElementById('stu-today-label');
+  if (stuLabel) stuLabel.textContent = ev ? (isToday ? 'Tonight' : 'Next event') : 'Tonight';
+  const stuBadge = document.getElementById('stu-today-badge');
+  if (stuBadge) stuBadge.textContent = ev ? (isToday ? 'Tonight' : 'Upcoming') : 'Tonight';
 
   const teacherName = document.getElementById('today-event-name');
   if (teacherName) {
