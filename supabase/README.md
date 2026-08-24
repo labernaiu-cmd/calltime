@@ -109,6 +109,16 @@ folder in order (or use the Supabase CLI: `supabase db push`):
     student who joined via invite link before this migration (or before
     the login screen's name field existed) would otherwise be stuck with
     whatever `nameFromEmail()` guessed from their email address.
+14. `migrations/0014_claim_preinvited_row.sql` — lets a student link their
+    own account to a roster row a teacher pre-added by email
+    (`addStudent()`/CSV import) before that account existed or ever signed
+    in. Migration 0003's trigger only backfills `user_id` when signing in
+    creates a *brand-new* `auth.users` row — an account that already
+    existed at invite time (a returning student, or anyone re-testing with
+    a previously-used email) never gets linked automatically, and RLS
+    otherwise hides an unlinked row (`user_id is null`) from everyone but
+    that ensemble's teacher. See `claimPreInvitedRows()` in
+    `calltime.html`, called on every sign-in.
 
 ## 3. Enable email auth
 

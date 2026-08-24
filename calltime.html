@@ -2004,6 +2004,7 @@ if (sb) {
       // whatever the login screen's Teacher/Student picker happened to
       // default to (or what a stale ct_login_role says).
       if (new URLSearchParams(window.location.search).has('join')) loginRole = 'student';
+      await claimPreInvitedRows();
       await loadEnsemblesFromDB();
       enterApp();
       await handleJoinDeepLink(); // no-op unless the URL has ?join=<ensembleId> (see copyInviteLink())
@@ -4790,6 +4791,24 @@ async function loadRosterFromDB(e) {
   (presentRes.data || []).forEach(p => { presentCounts[p.user_id] = (presentCounts[p.user_id]||0) + 1; });
   e.students = rows.filter(m => m.role === 'student' && m.status === 'active')
     .map(m => mapMemberToStudent(m, m.user_id ? absenceCounts[m.user_id] : 0, m.user_id ? excusedCounts[m.user_id] : 0, m.user_id ? presentCounts[m.user_id] : 0));
+}
+
+// Claims any ensemble_members row a teacher pre-added by this account's
+// email (addStudent()/CSV import) before it was ever linked to a real
+// account — migration 0003's trigger only backfills user_id when a
+// *brand-new* auth.users row is created, so an account that already
+// existed at invite time (a returning student, or anyone re-testing with
+// a previously-used email) never gets linked automatically. Runs on every
+// sign-in, not just an invite-link visit, since a student might
+// reasonably sign in directly rather than through the link a teacher
+// sent. Matches by email via migration 0014's RLS policy — an unlinked
+// row is otherwise invisible to everyone but that ensemble's teacher.
+async function claimPreInvitedRows() {
+  const { error } = await sb.from('ensemble_members')
+    .update({ user_id: authSession.user.id, status: 'active' })
+    .ilike('email', currentStudent.email)
+    .is('user_id', null);
+  if (error) console.error('claimPreInvitedRows failed', error);
 }
 
 // Every ensemble in the system (RLS lets any signed-in user read the
